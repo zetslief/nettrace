@@ -23,11 +23,11 @@ public static class NettraceReader
         Span<byte> magic = stackalloc byte[8];
         stream.ReadExactly(magic);
 
-        var streamHeader = ReadString(stream);
-
         Console.Write("Magic: ");
         Fmt.BytesHex(magic);
-        Console.WriteLine();
+        Console.WriteLine($" -> {Encoding.UTF8.GetString(magic)}");
+
+        var streamHeader = ReadString(stream);
 
         Console.Write("StreamHeader: ");
         Console.WriteLine(streamHeader);
@@ -65,6 +65,7 @@ public static class NettraceReader
 
     private static Trace TraceDecoder(Stream stream)
     {
+        /*
         var year = ReadInt16(stream);
         var month = ReadInt16(stream);
         var dayOfWeek = ReadInt16(stream);
@@ -79,6 +80,7 @@ public static class NettraceReader
         var processId = ReadInt32(stream);
         var numberOfProcessors = ReadInt32(stream);
         var expectedCpuSamplingRate = ReadInt32(stream);
+        */
         return new();
     }
 
