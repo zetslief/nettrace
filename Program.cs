@@ -17,12 +17,12 @@ public static class NettraceReader
     public record Type(Tag Tag, string Name, int Vesrion, int MinimumReaderVersion);
     public record Trace(
         DateTime DateTime,
-         long SynTimeQpc,
-         long QpcFrequency,
-         int PointerSize,
-         int ProcessId,
-         int NumberOfProcessors,
-         int ExpectedCpuSamplingRate);
+        long SynTimeQpc,
+        long QpcFrequency,
+        int PointerSize,
+        int ProcessId,
+        int NumberOfProcessors,
+        int ExpectedCpuSamplingRate);
     public record Object<T>(Type Type, T Payload);
 
     public static void Read(Stream stream)
@@ -41,6 +41,9 @@ public static class NettraceReader
 
         Object<Trace> trace = ReadObject(stream, TraceDecoder);
         Console.WriteLine(trace);
+
+        Object<string> next = ReadObject(stream, SkipPayloadDecoder);
+        Console.WriteLine(next);
     }
 
     private static Object<T> ReadObject<T>(Stream stream, Func<Stream, T> payloadDecoder)
@@ -97,11 +100,21 @@ public static class NettraceReader
         );
     }
 
-    private static byte ReadTag(Stream stream)
+    private static string SkipPayloadDecoder(Stream stream)
+    {
+        while (ReadTag(stream) != Tag.EndObject)
+        {
+            // skip
+        }
+        stream.Seek(-1, SeekOrigin.Current);
+        return "Empty";
+    }
+
+    private static Tag ReadTag(Stream stream)
     {
         Span<byte> tag = [0];
         stream.ReadExactly(tag);
-        return tag[0];
+        return (Tag)tag[0];
     }
 
     private static string ReadString(Stream stream)
