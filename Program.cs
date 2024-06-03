@@ -15,7 +15,14 @@ public static class NettraceReader
     }
 
     public record Type(Tag Tag, string Name, int Vesrion, int MinimumReaderVersion);
-    public record Trace();
+    public record Trace(
+        DateTime DateTime,
+         long SynTimeQpc,
+         long QpcFrequency,
+         int PointerSize,
+         int ProcessId,
+         int NumberOfProcessors,
+         int ExpectedCpuSamplingRate);
     public record Object<T>(Type Type, T Payload);
 
     public static void Read(Stream stream)
@@ -65,7 +72,6 @@ public static class NettraceReader
 
     private static Trace TraceDecoder(Stream stream)
     {
-        /*
         var year = ReadInt16(stream);
         var month = ReadInt16(stream);
         var dayOfWeek = ReadInt16(stream);
@@ -80,8 +86,15 @@ public static class NettraceReader
         var processId = ReadInt32(stream);
         var numberOfProcessors = ReadInt32(stream);
         var expectedCpuSamplingRate = ReadInt32(stream);
-        */
-        return new();
+        return new(
+            new(year, month, day, hour, minute, second, millisecond),
+            syncTimeQpc,
+            qpcFrequency,
+            pointerSize,
+            processId,
+            numberOfProcessors,
+            expectedCpuSamplingRate
+        );
     }
 
     private static byte ReadTag(Stream stream)
@@ -99,11 +112,11 @@ public static class NettraceReader
         return Encoding.UTF8.GetString(content);
     }
 
-    private static int ReadInt16(Stream stream)
+    private static short ReadInt16(Stream stream)
     {
         Span<byte> lengthBytes = stackalloc byte[2];
         stream.ReadExactly(lengthBytes);
-        return MemoryMarshal.Read<int>(lengthBytes);
+        return MemoryMarshal.Read<short>(lengthBytes);
     }
 
     private static int ReadInt32(Stream stream)
@@ -113,11 +126,11 @@ public static class NettraceReader
         return MemoryMarshal.Read<int>(lengthBytes);
     }
 
-    private static int ReadInt64(Stream stream)
+    private static long ReadInt64(Stream stream)
     {
         Span<byte> lengthBytes = stackalloc byte[8];
         stream.ReadExactly(lengthBytes);
-        return MemoryMarshal.Read<int>(lengthBytes);
+        return MemoryMarshal.Read<long>(lengthBytes);
     }
 
     private static void PrintBytes(ReadOnlySpan<byte> bytes)
