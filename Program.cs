@@ -23,6 +23,8 @@ public static class NettraceReader
         int ProcessId,
         int NumberOfProcessors,
         int ExpectedCpuSamplingRate);
+    public record Header(short HeaderSize, short Flags, long MinTimestamp, long MaxTimestamp, byte[] Reserved);
+    public record Block(int BlockSize, Header Header); // MetaddtaaBlock block uses the same layout as EventBlock 
     public record Object<T>(Type Type, T Payload);
 
     public static void Read(Stream stream)
@@ -42,7 +44,7 @@ public static class NettraceReader
         Object<Trace> trace = ReadObject(stream, TraceDecoder);
         Console.WriteLine(trace);
 
-        Object<string> next = ReadObject(stream, SkipPayloadDecoder);
+        Object<Block> next = ReadObject(stream, BlockDecoder);
         Console.WriteLine(next);
     }
 
@@ -98,6 +100,26 @@ public static class NettraceReader
             numberOfProcessors,
             expectedCpuSamplingRate
         );
+    }
+
+    private static Block BlockDecoder(Stream stream)
+    {
+        var blockSize = ReadInt32(stream);
+        
+        long alignOffset = 4 - (stream.Position % 4);
+        stream.Seek(alignOffset, SeekOrigin.Current);
+
+        var headerSize = ReadInt16(stream);
+        var flags = ReadInt16(stream);
+        var minTimestamp = ReadInt64(stream);
+        var maxTimestamp = ReadInt64(stream);
+
+        int totalLengthRead = 2 + 2 + 8 + 8;
+        var reserved = new byte[headerSize - totalLengthRead];
+        stream.ReadExactly(reserved);
+
+        SkipPayloadDecoder(stream);
+        return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved));
     }
 
     private static string SkipPayloadDecoder(Stream stream)
