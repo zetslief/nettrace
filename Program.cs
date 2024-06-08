@@ -24,7 +24,8 @@ public static class NettraceReader
         int NumberOfProcessors,
         int ExpectedCpuSamplingRate);
     public record Header(short HeaderSize, short Flags, long MinTimestamp, long MaxTimestamp, byte[] Reserved);
-    public record Block(int BlockSize, Header Header); // MetaddtaaBlock block uses the same layout as EventBlock 
+    public record EventBlob();
+    public record Block(int BlockSize, Header Header, EventBlob[] EventBlobs); // MetaddtaaBlock block uses the same layout as EventBlock 
     public record Object<T>(Type Type, T Payload);
 
     public static void Read(Stream stream)
@@ -118,8 +119,13 @@ public static class NettraceReader
         var reserved = new byte[headerSize - totalLengthRead];
         stream.ReadExactly(reserved);
 
+        // event blob
+        var previousMetadataId = 0;
+        var flag = ReadByte(stream);
+        Console.WriteLine($"Event blob flag: {flag:b} {(flag & 1):b}");
         SkipPayloadDecoder(stream);
-        return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved));
+
+        return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved), []);
     }
 
     private static string SkipPayloadDecoder(Stream stream)
@@ -132,12 +138,7 @@ public static class NettraceReader
         return "Empty";
     }
 
-    private static Tag ReadTag(Stream stream)
-    {
-        Span<byte> tag = [0];
-        stream.ReadExactly(tag);
-        return (Tag)tag[0];
-    }
+    private static Tag ReadTag(Stream stream) => (Tag)ReadByte(stream);
 
     private static string ReadString(Stream stream)
     {
@@ -145,6 +146,13 @@ public static class NettraceReader
         Span<byte> content = new byte[length];
         stream.ReadExactly(content);
         return Encoding.UTF8.GetString(content);
+    }
+
+    private static byte ReadByte(Stream stream)
+    {
+        Span<byte> content = [0];
+        stream.ReadExactly(content);
+        return content[0];
     }
 
     private static short ReadInt16(Stream stream)
