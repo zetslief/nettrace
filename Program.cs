@@ -120,8 +120,7 @@ public static class NettraceReader
         var minTimestamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
         var maxTimestamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
 
-        var reserved = new byte[headerSize - cursor];
-        stream.ReadExactly(reserved);
+        var reserved = blockBytes[cursor..headerSize];
 
         // event blob
         var previousMetadataId = 0;
@@ -129,7 +128,7 @@ public static class NettraceReader
         Console.WriteLine($"Event blob flag: {flag:b} {(flag & 1):b}");
         SkipPayloadDecoder(stream);
 
-        return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved), []);
+        return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), []);
     }
 
     private static string SkipPayloadDecoder(Stream stream)
