@@ -110,13 +110,17 @@ public static class NettraceReader
         long alignOffset = 4 - (stream.Position % 4);
         stream.Seek(alignOffset, SeekOrigin.Current);
 
-        var headerSize = ReadInt16(stream);
-        var flags = ReadInt16(stream);
-        var minTimestamp = ReadInt64(stream);
-        var maxTimestamp = ReadInt64(stream);
+        Span<byte> blockBytes = new byte[blockSize];
+        stream.ReadExactly(blockBytes);
 
-        int totalLengthRead = 2 + 2 + 8 + 8;
-        var reserved = new byte[headerSize - totalLengthRead];
+        int cursor = 0;
+        static int MoveBy(ref int value, int by) => value += by; 
+        var headerSize = MemoryMarshal.Read<short>(blockBytes[cursor..MoveBy(ref cursor, 2)]);
+        var flags = MemoryMarshal.Read<short>(blockBytes[cursor..MoveBy(ref cursor, 2)]);
+        var minTimestamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
+        var maxTimestamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
+
+        var reserved = new byte[headerSize - cursor];
         stream.ReadExactly(reserved);
 
         // event blob
