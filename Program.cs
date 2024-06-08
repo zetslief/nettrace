@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Runtime.InteropServices;
+using System.Reflection.Metadata;
 
 var filePath = args[0];
 using var file = File.OpenRead(filePath);
@@ -120,13 +121,72 @@ public static class NettraceReader
         var minTimestamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
         var maxTimestamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
 
-        var reserved = blockBytes[cursor..headerSize];
+        var reserved = blockBytes[cursor..MoveBy(ref cursor, headerSize - cursor)];
+
+        // parsing event blobs
+
+        // parser state for this block
+        int previousMetadataId = 0;
+        int previousSequenceNumber = 0;
+        long previousCaptureThreadId = 0;
+        int previousProcessorNumber = 0;
+        long previousThreadId = 0;
+        int previousStackId = 0;
+        long previousTimeStamp = 0;
+        Guid previousActivityId = Guid.Empty;
+        Guid previousRelatedActivityId = Guid.Empty;
+        int previousPayloadSize = 0;
 
         // event blob
-        var previousMetadataId = 0;
-        var flag = ReadByte(stream);
+        var flag = blockBytes[MoveBy(ref cursor, 1)];
+        var firstBitIsSet = (flag & 1) == 1;
+        var secondBitIsSet = (flag & 2) == 1;
+        var thirdBitIsSet = (flag & 4) == 1;
+        var forthBitIsSet = (flag & 8) == 1;
+        var fifthBitIsSet = (flag & 16) == 1;
+        var sixthBitIsSet = (flag & 32) == 1;
+        var seventhBitIsSet = (flag & 64) == 1;
+        var eighthBitIsSet = (flag & 128) == 1;
+
+        var metadataId = firstBitIsSet
+            ? ReadVarInt32(blockBytes, ref cursor)
+            : previousMetadataId;
+        var sequenceNumber = secondBitIsSet
+            ? ReadVarInt32(blockBytes, ref cursor) + previousSequenceNumber
+            : previousSequenceNumber;
+        if (metadataId != 0)
+        {
+            ++sequenceNumber;
+        }
+        var captureThreadId = secondBitIsSet
+            ? ReadVarInt64(blockBytes, ref cursor)
+            : previousCaptureThreadId;
+        var processorNumber = secondBitIsSet
+            ? ReadVarInt32(blockBytes, ref cursor)
+            : previousProcessorNumber; 
+        var threadId = thirdBitIsSet
+            ? ReadVarInt64(blockBytes, ref cursor)
+            : previousThreadId;
+        var stackId = forthBitIsSet
+            ? ReadVarInt32(blockBytes, ref cursor)
+            : previousStackId;
+        var timeStamp = ReadVarInt64(blockBytes, ref cursor) + previousTimeStamp;
+        var activityId = fifthBitIsSet
+            ? ReadGuid(blockBytes, ref cursor)
+            : previousActivityId;
+        var relatedActivityId = sixthBitIsSet
+            ? ReadGuid(blockBytes, ref cursor)
+            : previousRelatedActivityId;
+        var isSorted = seventhBitIsSet;
+        var payloadSize = eighthBitIsSet
+            ? ReadVarInt32(blockBytes, ref cursor)
+            : previousPayloadSize;
+        
+        var payload = blockBytes[cursor..MoveBy(ref cursor, payloadSize)];
+        
+        // set parse state here
+
         Console.WriteLine($"Event blob flag: {flag:b} {(flag & 1):b}");
-        SkipPayloadDecoder(stream);
 
         return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), []);
     }
@@ -188,6 +248,20 @@ public static class NettraceReader
         Console.WriteLine($"{bytes[^1]:D}");
     }
 
+    private static int ReadVarInt32(Span<byte> bytes, ref int cursor)
+    {
+        throw new NotImplementedException($"{nameof(ReadVarInt32)} is not implemented!");
+    }
+
+    private static int ReadVarInt64(Span<byte> bytes, ref int cursor)
+    {
+        throw new NotImplementedException($"{nameof(ReadVarInt64)} is not implemented!");
+    }
+
+    private static Guid ReadGuid(Span<byte> bytes, ref int cursor)
+    {
+        throw new NotImplementedException($"{nameof(ReadGuid)} is not implemented!");
+    }
 }
 
 internal static class Fmt
