@@ -1,6 +1,5 @@
 ﻿using System.Text;
 using System.Runtime.InteropServices;
-using System.Reflection.Metadata;
 
 var filePath = args[0];
 using var file = File.OpenRead(filePath);
@@ -115,7 +114,6 @@ public static class NettraceReader
         stream.ReadExactly(blockBytes);
 
         int cursor = 0;
-        static int MoveBy(ref int value, int by) => value += by; 
         var headerSize = MemoryMarshal.Read<short>(blockBytes[cursor..MoveBy(ref cursor, 2)]);
         var flags = MemoryMarshal.Read<short>(blockBytes[cursor..MoveBy(ref cursor, 2)]);
         var minTimestamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
@@ -201,6 +199,8 @@ public static class NettraceReader
         return "Empty";
     }
 
+    static int MoveBy(ref int value, int by) => value += by; 
+
     private static Tag ReadTag(Stream stream) => (Tag)ReadByte(stream);
 
     private static string ReadString(Stream stream)
@@ -250,18 +250,36 @@ public static class NettraceReader
 
     private static int ReadVarInt32(Span<byte> bytes, ref int cursor)
     {
-        throw new NotImplementedException($"{nameof(ReadVarInt32)} is not implemented!");
+        int result = 0;
+        for (int byteIndex = 0; byteIndex < cursor + 5; ++byteIndex, ++cursor)
+        {
+            int @byte = bytes[byteIndex];
+            if (@byte == 0)
+            {
+                break;
+            }
+            @byte <<= 7 * byteIndex;
+            result |= @byte;
+        }
+        return result;
     }
 
     private static int ReadVarInt64(Span<byte> bytes, ref int cursor)
     {
-        throw new NotImplementedException($"{nameof(ReadVarInt64)} is not implemented!");
+        int result = 0;
+        for (int byteIndex = 0; byteIndex < cursor + 9; ++byteIndex, ++cursor)
+        {
+            int @byte = bytes[byteIndex];
+            if (@byte == 0)
+                break;
+            @byte <<= 7 * byteIndex;
+            result |= @byte;
+        }
+        return result;
     }
 
     private static Guid ReadGuid(Span<byte> bytes, ref int cursor)
-    {
-        throw new NotImplementedException($"{nameof(ReadGuid)} is not implemented!");
-    }
+        => MemoryMarshal.Read<Guid>(bytes[cursor..MoveBy(ref cursor, 16)]);
 }
 
 internal static class Fmt
