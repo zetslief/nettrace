@@ -55,13 +55,13 @@ public static class NettraceReader
         }
     }
     public record Stack(int StackSize, byte[] Payload);
-    public sealed record StackBlock(int BlockSize, int FirstId, int Count, List<Stack> Stacks)
+    public sealed record StackBlock(int BlockSize, int FirstId, int Count, Stack[] Stacks)
     {
         private bool PrintMembers(StringBuilder builder)
         {
             builder.AppendLine($"Block: {BlockSize} bytes");
             builder.AppendLine($"FirstId: {FirstId} Count: {Count}");
-            builder.AppendLine($"Stacks: {Stacks.Count}");
+            builder.AppendLine($"Stacks: {Stacks.Length}");
             foreach (var stack in Stacks)
             {
                 builder.AppendLine($"\t{stack}");
@@ -69,6 +69,8 @@ public static class NettraceReader
             return true;
         }
     }
+    public record EventThread(long ThreadId, int SequenceNumber);
+    public record SequencePointBlock(int BlockSize, long TimeStamp, int ThreadCount, EventThread[] Threads); 
     public record Object<T>(Type Type, T Payload);
 
     public static void Read(Stream stream)
@@ -299,11 +301,11 @@ public static class NettraceReader
         var firstId = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
         var count = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
 
-        var stacks = new List<Stack>();
-        while (cursor < blockBytes.Length)
+        var stacks = new Stack[count];
+        for (int stackIndex = 0; stackIndex < stacks.Length; ++stackIndex)
         {
             var stackSize = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
-            stacks.Add(new(stackSize, [.. blockBytes[cursor..MoveBy(ref cursor, stackSize)]]));
+            stacks[stackIndex] = new(stackSize, [.. blockBytes[cursor..MoveBy(ref cursor, stackSize)]]);
         }
         return new(blockSize, firstId, count, stacks);
     }
