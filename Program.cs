@@ -24,8 +24,24 @@ public static class NettraceReader
         int NumberOfProcessors,
         int ExpectedCpuSamplingRate);
     public record Header(short HeaderSize, short Flags, long MinTimestamp, long MaxTimestamp, byte[] Reserved);
-    public record EventBlob();
-    public record Block(int BlockSize, Header Header, EventBlob[] EventBlobs); // MetaddtaaBlock block uses the same layout as EventBlock 
+    public record EventBlob(
+        byte Flags,
+        int MetadataId,
+        int SequenceNumber,
+        long CaptureThreadId,
+        int ProcessorNumber,
+        long ThreadId,
+        int StackId,
+        long TimeStamp,
+        Guid ActivityId,
+        Guid RelatedActivityId,
+        bool IsSorted,
+        int PayloadSize,
+        byte[] Payload
+    );
+    public sealed record Block(int BlockSize, Header Header, EventBlob[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
+    {
+    }
     public record Object<T>(Type Type, T Payload);
 
     public static void Read(Stream stream)
@@ -136,57 +152,71 @@ public static class NettraceReader
         int previousPayloadSize = 0;
 
         // event blob
-        var flag = blockBytes[MoveBy(ref cursor, 1)];
-        var firstBitIsSet = (flag & 1) == 1;
-        var secondBitIsSet = (flag & 2) == 1;
-        var thirdBitIsSet = (flag & 4) == 1;
-        var forthBitIsSet = (flag & 8) == 1;
-        var fifthBitIsSet = (flag & 16) == 1;
-        var sixthBitIsSet = (flag & 32) == 1;
-        var seventhBitIsSet = (flag & 64) == 1;
-        var eighthBitIsSet = (flag & 128) == 1;
-
-        var metadataId = firstBitIsSet
-            ? ReadVarInt32(blockBytes, ref cursor)
-            : previousMetadataId;
-        var sequenceNumber = secondBitIsSet
-            ? ReadVarInt32(blockBytes, ref cursor) + previousSequenceNumber
-            : previousSequenceNumber;
-        if (metadataId != 0)
+        var eventBlobs = new List<EventBlob>(100);
+        while (cursor < blockBytes.Length)
         {
-            ++sequenceNumber;
+            var flag = blockBytes[MoveBy(ref cursor, 1)];
+            var firstBitIsSet = (flag & 1) == 1;
+            var secondBitIsSet = (flag & 2) == 1;
+            var thirdBitIsSet = (flag & 4) == 1;
+            var forthBitIsSet = (flag & 8) == 1;
+            var fifthBitIsSet = (flag & 16) == 1;
+            var sixthBitIsSet = (flag & 32) == 1;
+            var seventhBitIsSet = (flag & 64) == 1;
+            var eighthBitIsSet = (flag & 128) == 1;
+
+            var metadataId = firstBitIsSet
+                ? ReadVarInt32(blockBytes, ref cursor)
+                : previousMetadataId;
+            var sequenceNumber = secondBitIsSet
+                ? ReadVarInt32(blockBytes, ref cursor) + previousSequenceNumber
+                : previousSequenceNumber;
+            if (metadataId != 0)
+            {
+                ++sequenceNumber;
+            }
+            long captureThreadId = secondBitIsSet
+                ? ReadVarInt64(blockBytes, ref cursor)
+                : previousCaptureThreadId;
+            int processorNumber = secondBitIsSet
+                ? ReadVarInt32(blockBytes, ref cursor)
+                : previousProcessorNumber; 
+            long threadId = thirdBitIsSet
+                ? ReadVarInt64(blockBytes, ref cursor)
+                : previousThreadId;
+            int stackId = forthBitIsSet
+                ? ReadVarInt32(blockBytes, ref cursor)
+                : previousStackId;
+            long timeStamp = ReadVarInt64(blockBytes, ref cursor) + previousTimeStamp;
+            Guid activityId = fifthBitIsSet
+                ? ReadGuid(blockBytes, ref cursor)
+                : previousActivityId;
+            Guid relatedActivityId = sixthBitIsSet
+                ? ReadGuid(blockBytes, ref cursor)
+                : previousRelatedActivityId;
+            bool isSorted = seventhBitIsSet;
+            int payloadSize = eighthBitIsSet
+                ? ReadVarInt32(blockBytes, ref cursor)
+                : previousPayloadSize;
+            
+            var payload = blockBytes[cursor..MoveBy(ref cursor, payloadSize)];
+            eventBlobs.Add(new(
+                flag,
+                metadataId,
+                sequenceNumber,
+                captureThreadId,
+                processorNumber,
+                threadId,
+                stackId,
+                timeStamp,
+                activityId,
+                relatedActivityId,
+                isSorted,
+                payloadSize,
+                payload.ToArray()));
         }
-        var captureThreadId = secondBitIsSet
-            ? ReadVarInt64(blockBytes, ref cursor)
-            : previousCaptureThreadId;
-        var processorNumber = secondBitIsSet
-            ? ReadVarInt32(blockBytes, ref cursor)
-            : previousProcessorNumber; 
-        var threadId = thirdBitIsSet
-            ? ReadVarInt64(blockBytes, ref cursor)
-            : previousThreadId;
-        var stackId = forthBitIsSet
-            ? ReadVarInt32(blockBytes, ref cursor)
-            : previousStackId;
-        var timeStamp = ReadVarInt64(blockBytes, ref cursor) + previousTimeStamp;
-        var activityId = fifthBitIsSet
-            ? ReadGuid(blockBytes, ref cursor)
-            : previousActivityId;
-        var relatedActivityId = sixthBitIsSet
-            ? ReadGuid(blockBytes, ref cursor)
-            : previousRelatedActivityId;
-        var isSorted = seventhBitIsSet;
-        var payloadSize = eighthBitIsSet
-            ? ReadVarInt32(blockBytes, ref cursor)
-            : previousPayloadSize;
-        
-        var payload = blockBytes[cursor..MoveBy(ref cursor, payloadSize)];
-        
-        // set parse state here
 
-        Console.WriteLine($"Event blob flag: {flag:b} {(flag & 1):b}");
-
-        return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), []);
+        return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), [.. eventBlobs]);
     }
 
     private static string SkipPayloadDecoder(Stream stream)
@@ -264,12 +294,12 @@ public static class NettraceReader
         return result;
     }
 
-    private static int ReadVarInt64(Span<byte> bytes, ref int cursor)
+    private static long ReadVarInt64(Span<byte> bytes, ref int cursor)
     {
-        int result = 0;
+        long result = 0;
         for (int byteIndex = 0; byteIndex < cursor + 9; ++byteIndex, ++cursor)
         {
-            int @byte = bytes[byteIndex];
+            long @byte = bytes[byteIndex];
             if (@byte == 0)
                 break;
             @byte <<= 7 * byteIndex;
