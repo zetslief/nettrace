@@ -70,7 +70,20 @@ public static class NettraceReader
         }
     }
     public record EventThread(long ThreadId, int SequenceNumber);
-    public record SequencePointBlock(int BlockSize, long TimeStamp, int ThreadCount, EventThread[] Threads); 
+    public sealed record SequencePointBlock(int BlockSize, long TimeStamp, int ThreadCount, EventThread[] Threads)
+    {
+        private bool PrintMembers(StringBuilder builder)
+        {
+            builder.AppendLine($"Sequence Point Block: {BlockSize} bytes");
+            builder.AppendLine($"TimeStamp: {TimeStamp} ThreadCount: {ThreadCount}");
+            builder.AppendLine($"Threads: {Threads.Length}");
+            foreach (var thread in Threads)
+            {
+                builder.AppendLine($"\t{thread}");
+            }
+            return true;
+        }
+    }
     public record Object<T>(Type Type, T Payload);
 
     public static void Read(Stream stream)
@@ -111,8 +124,13 @@ public static class NettraceReader
         Object<Block> yetAnotherEventBlock = ReadObject(stream, BlockDecoder);
         Console.WriteLine(yetAnotherEventBlock);
 
-        Object<SequencePointBlock> next = ReadObject(stream, SequencePointBlockDecoder);
-        Console.WriteLine(next);
+        Object<SequencePointBlock> sequencePointBlock = ReadObject(stream, SequencePointBlockDecoder);
+        Console.WriteLine(sequencePointBlock);
+
+        while (true)
+        {
+            Console.Write($"{ReadByte(stream):B} ");
+        }
     }
 
     private static Object<T> ReadObject<T>(Stream stream, Func<Stream, T> payloadDecoder)
@@ -173,8 +191,7 @@ public static class NettraceReader
     {
         var blockSize = ReadInt32(stream);
         
-        long alignOffset = 4 - (stream.Position % 4);
-        stream.Seek(alignOffset, SeekOrigin.Current);
+        Align(stream);
 
         Span<byte> blockBytes = new byte[blockSize];
         stream.ReadExactly(blockBytes);
@@ -290,8 +307,7 @@ public static class NettraceReader
     {
         int blockSize = ReadInt32(stream);
 
-        long alignOffset = 4 - (stream.Position % 4);
-        stream.Seek(alignOffset, SeekOrigin.Current);
+        Align(stream);
 
         Span<byte> blockBytes = new byte[blockSize];
         stream.ReadExactly(blockBytes);
@@ -312,12 +328,30 @@ public static class NettraceReader
 
     private static SequencePointBlock SequencePointBlockDecoder(Stream stream)
     {
-        throw new NotImplementedException($"{nameof(SequencePointBlockDecoder)} is not implemented!");
+        var blockSize = ReadInt32(stream);
+
+        Align(stream);
+
+        Span<byte> blockBytes = new byte[blockSize];
+        int cursor = 0;
+
+        long timeStamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
+        int threadCount = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
+
+        var threads = new EventThread[threadCount];
+        for (int threadIndex = 0; threadIndex < threads.Length; ++threadIndex)
+        {
+            long threadId = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
+            int sequenceNumber = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
+            threads[threadIndex] = new(threadId, sequenceNumber);
+        }
+
+        return new(blockSize, timeStamp, threadCount, threads);
     }
 
     private static string SkipPayloadDecoder(Stream stream)
     {
-        while (ReadTag(stream) != Tag.EndObject)
+        while (ReadByte(stream) != (byte)Tag.EndObject)
         {
             // skip
         }
@@ -326,6 +360,12 @@ public static class NettraceReader
     }
 
     static int MoveBy(ref int value, int by) => value += by; 
+
+    private static void Align(Stream stream)
+    {
+        var padding = (4 - (stream.Position % 4)) % 4;
+        stream.Seek(padding, SeekOrigin.Current);
+    }
 
     private static Tag ReadTag(Stream stream) => (Tag)ReadByte(stream);
 
