@@ -55,7 +55,20 @@ public static class NettraceReader
         }
     }
     public record Stack(int StackSize, byte[] Payload);
-    public record StackBlock(int BlockSize, int FirstId, int Count, Stack[] Stacks);
+    public sealed record StackBlock(int BlockSize, int FirstId, int Count, List<Stack> Stacks)
+    {
+        private bool PrintMembers(StringBuilder builder)
+        {
+            builder.AppendLine($"Block: {BlockSize} bytes");
+            builder.AppendLine($"FirstId: {FirstId} Count: {Count}");
+            builder.AppendLine($"Stacks: {Stacks.Count}");
+            foreach (var stack in Stacks)
+            {
+                builder.AppendLine($"\t{stack}");
+            }
+            return true;
+        }
+    }
     public record Object<T>(Type Type, T Payload);
 
     public static void Read(Stream stream)
@@ -78,7 +91,10 @@ public static class NettraceReader
         Object<Block> metadataBlock = ReadObject(stream, BlockDecoder);
         Console.WriteLine(metadataBlock);
 
-        Object<string> next = ReadObject(stream, SkipPayloadDecoder);
+        Object<StackBlock> stackBlock = ReadObject(stream, StackBlockDecoder);
+        Console.WriteLine(stackBlock);
+
+        Object<Block> next = ReadObject(stream, BlockDecoder);
         Console.WriteLine(next);
     }
 
@@ -106,7 +122,7 @@ public static class NettraceReader
 
         var endObject = ReadTag(stream);
 
-        return new((Tag)tag, name, version, minimumReaderVersion);
+        return new(tag, name, version, minimumReaderVersion);
     }
 
     private static Trace TraceDecoder(Stream stream)
@@ -255,6 +271,26 @@ public static class NettraceReader
 
     private static StackBlock StackBlockDecoder(Stream stream)
     {
+        int blockSize = ReadInt32(stream);
+
+        long alignOffset = 4 - (stream.Position % 4);
+        stream.Seek(alignOffset, SeekOrigin.Current);
+
+        Span<byte> blockBytes = new byte[blockSize];
+        stream.ReadExactly(blockBytes);
+
+        var cursor = 0;
+
+        var firstId = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
+        var count = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
+
+        var stacks = new List<Stack>();
+        while (cursor < blockBytes.Length)
+        {
+            var stackSize = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
+            stacks.Add(new(stackSize, [.. blockBytes[cursor..MoveBy(ref cursor, stackSize)]]));
+        }
+        return new(blockSize, firstId, count, stacks);
     }
 
     private static string SkipPayloadDecoder(Stream stream)
