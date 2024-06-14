@@ -54,6 +54,8 @@ public static class NettraceReader
             return true;
         }
     }
+    public record Stack(int StackSize, byte[] Payload);
+    public record StackBlock(int BlockSize, int FirstId, int Count, Stack[] Stacks);
     public record Object<T>(Type Type, T Payload);
 
     public static void Read(Stream stream)
@@ -73,8 +75,8 @@ public static class NettraceReader
         Object<Trace> trace = ReadObject(stream, TraceDecoder);
         Console.WriteLine(trace);
 
-        Object<Block> firstBlock = ReadObject(stream, BlockDecoder);
-        Console.WriteLine(firstBlock);
+        Object<Block> metadataBlock = ReadObject(stream, BlockDecoder);
+        Console.WriteLine(metadataBlock);
 
         Object<string> next = ReadObject(stream, SkipPayloadDecoder);
         Console.WriteLine(next);
@@ -249,6 +251,10 @@ public static class NettraceReader
         }
 
         return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), [.. eventBlobs]);
+    }
+
+    private static StackBlock StackBlockDecoder(Stream stream)
+    {
     }
 
     private static string SkipPayloadDecoder(Stream stream)
