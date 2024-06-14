@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Runtime.InteropServices;
+using System;
 
 var filePath = args[0];
 using var file = File.OpenRead(filePath);
@@ -75,7 +76,7 @@ public static class NettraceReader
         Object<Block> firstBlock = ReadObject(stream, BlockDecoder);
         Console.WriteLine(firstBlock);
 
-        Object<Block> next = ReadObject(stream, BlockDecoder);
+        Object<string> next = ReadObject(stream, SkipPayloadDecoder);
         Console.WriteLine(next);
     }
 
@@ -229,7 +230,8 @@ public static class NettraceReader
             previousRelatedActivityId = relatedActivityId;
             previousPayloadSize = payloadSize;
             
-            var payload = blockBytes[cursor..MoveBy(ref cursor, payloadSize)];
+            ReadOnlySpan<byte> payload = blockBytes[cursor..MoveBy(ref cursor, payloadSize)];
+
             eventBlobs.Add(new(
                 flag,
                 metadataId,
