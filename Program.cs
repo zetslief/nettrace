@@ -41,6 +41,13 @@ public static class NettraceReader
     );
     public sealed record Block(int BlockSize, Header Header, EventBlob[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
     {
+        private bool PrintMembers(StringBuilder builder)
+        {
+            builder.AppendLine($"Block: {BlockSize} bytes");
+            builder.AppendLine($"Header: {Header}");
+            builder.AppendLine($"EventBlobs: {EventBlobs.Length}");
+            return true;
+        }
     }
     public record Object<T>(Type Type, T Payload);
 
