@@ -94,7 +94,22 @@ public static class NettraceReader
         Object<StackBlock> stackBlock = ReadObject(stream, StackBlockDecoder);
         Console.WriteLine(stackBlock);
 
-        Object<Block> next = ReadObject(stream, BlockDecoder);
+        Object<Block> eventBlock = ReadObject(stream, BlockDecoder);
+        Console.WriteLine(eventBlock);
+
+        Object<Block> anotherMetadataBlock = ReadObject(stream, BlockDecoder);
+        Console.WriteLine(anotherMetadataBlock);
+
+        Object<Block> anotherEventBlock = ReadObject(stream, BlockDecoder);
+        Console.WriteLine(anotherEventBlock);
+
+        Object<Block> yetAnotherMetadataBlock = ReadObject(stream, BlockDecoder);
+        Console.WriteLine(yetAnotherMetadataBlock);
+
+        Object<Block> yetAnotherEventBlock = ReadObject(stream, BlockDecoder);
+        Console.WriteLine(yetAnotherEventBlock);
+
+        Object<string> next = ReadObject(stream, SkipPayloadDecoder);
         Console.WriteLine(next);
     }
 
