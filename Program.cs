@@ -111,7 +111,7 @@ public static class NettraceReader
         Object<Block> yetAnotherEventBlock = ReadObject(stream, BlockDecoder);
         Console.WriteLine(yetAnotherEventBlock);
 
-        Object<string> next = ReadObject(stream, SkipPayloadDecoder);
+        Object<SequencePointBlock> next = ReadObject(stream, SequencePointBlockDecoder);
         Console.WriteLine(next);
     }
 
@@ -308,6 +308,11 @@ public static class NettraceReader
             stacks[stackIndex] = new(stackSize, [.. blockBytes[cursor..MoveBy(ref cursor, stackSize)]]);
         }
         return new(blockSize, firstId, count, stacks);
+    }
+
+    private static SequencePointBlock SequencePointBlockDecoder(Stream stream)
+    {
+        throw new NotImplementedException($"{nameof(SequencePointBlockDecoder)} is not implemented!");
     }
 
     private static string SkipPayloadDecoder(Stream stream)
