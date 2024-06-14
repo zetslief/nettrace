@@ -46,6 +46,10 @@ public static class NettraceReader
             builder.AppendLine($"Block: {BlockSize} bytes");
             builder.AppendLine($"Header: {Header}");
             builder.AppendLine($"EventBlobs: {EventBlobs.Length}");
+            foreach (var eventBlob in EventBlobs)
+            {
+                builder.AppendLine($"\t{eventBlob}");
+            }
             return true;
         }
     }
@@ -67,6 +71,9 @@ public static class NettraceReader
 
         Object<Trace> trace = ReadObject(stream, TraceDecoder);
         Console.WriteLine(trace);
+
+        Object<Block> firstBlock = ReadObject(stream, BlockDecoder);
+        Console.WriteLine(firstBlock);
 
         Object<Block> next = ReadObject(stream, BlockDecoder);
         Console.WriteLine(next);
@@ -144,6 +151,11 @@ public static class NettraceReader
 
         var reserved = blockBytes[cursor..MoveBy(ref cursor, headerSize - cursor)];
 
+        if ((flags & 1) != 1)
+        {
+            throw new NotImplementedException($"Uncompressed event blob format is not implemented!");
+        }
+
         // parsing event blobs
 
         // parser state for this block
@@ -205,6 +217,17 @@ public static class NettraceReader
             int payloadSize = eighthBitIsSet
                 ? ReadVarInt32(blockBytes, ref cursor)
                 : previousPayloadSize;
+
+            previousMetadataId = metadataId;
+            previousSequenceNumber = sequenceNumber;
+            previousCaptureThreadId = captureThreadId;
+            previousProcessorNumber = processorNumber;
+            previousThreadId = threadId;
+            previousStackId = stackId;
+            previousTimeStamp = timeStamp;
+            previousActivityId = activityId;
+            previousRelatedActivityId = relatedActivityId;
+            previousPayloadSize = payloadSize;
             
             var payload = blockBytes[cursor..MoveBy(ref cursor, payloadSize)];
             eventBlobs.Add(new(
