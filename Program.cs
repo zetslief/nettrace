@@ -127,10 +127,8 @@ public static class NettraceReader
         Object<SequencePointBlock> sequencePointBlock = ReadObject(stream, SequencePointBlockDecoder);
         Console.WriteLine(sequencePointBlock);
 
-        while (true)
-        {
-            Console.Write($"{ReadByte(stream):B} ");
-        }
+        Tag nullTag = ReadTag(stream);
+        Console.WriteLine($"Stream ends with {nullTag}");
     }
 
     private static Object<T> ReadObject<T>(Stream stream, Func<Stream, T> payloadDecoder)
@@ -333,6 +331,7 @@ public static class NettraceReader
         Align(stream);
 
         Span<byte> blockBytes = new byte[blockSize];
+        stream.ReadExactly(blockBytes);
         int cursor = 0;
 
         long timeStamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
