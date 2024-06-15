@@ -245,10 +245,7 @@ public static class NettraceReader
             var sequenceNumber = secondBitIsSet
                 ? ReadVarInt32(blockBytes, ref cursor) + context.SequenceNumber
                 : context.SequenceNumber;
-            if (metadataId != 0)
-            {
-                ++sequenceNumber;
-            }
+            sequenceNumber = metadataId == 0 ? sequenceNumber : sequenceNumber + 1;
             long captureThreadId = secondBitIsSet
                 ? ReadVarInt64(blockBytes, ref cursor)
                 : context.ThreadId;
