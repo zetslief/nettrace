@@ -1,6 +1,5 @@
 ﻿using System.Text;
 using System.Runtime.InteropServices;
-using System;
 
 var filePath = args[0];
 using var file = File.OpenRead(filePath);
@@ -225,15 +224,15 @@ public static class NettraceReader
         var eventBlobs = new List<EventBlob>(100);
         while (cursor < blockBytes.Length)
         {
-            var flag = blockBytes[MoveBy(ref cursor, 1)];
-            var firstBitIsSet = (flag & 1) == 1;
-            var secondBitIsSet = (flag & 2) == 1;
-            var thirdBitIsSet = (flag & 4) == 1;
-            var forthBitIsSet = (flag & 8) == 1;
-            var fifthBitIsSet = (flag & 16) == 1;
-            var sixthBitIsSet = (flag & 32) == 1;
-            var seventhBitIsSet = (flag & 64) == 1;
-            var eighthBitIsSet = (flag & 128) == 1;
+            var flag = blockBytes[cursor++];
+            var firstBitIsSet = (flag & 1) != 0;
+            var secondBitIsSet = (flag & 2) != 0;
+            var thirdBitIsSet = (flag & 4) != 0;
+            var forthBitIsSet = (flag & 8) != 0;
+            var fifthBitIsSet = (flag & 16) != 0;
+            var sixthBitIsSet = (flag & 32) != 0;
+            var seventhBitIsSet = (flag & 64) != 0;
+            var eighthBitIsSet = (flag & 128) != 0;
 
             var metadataId = firstBitIsSet
                 ? ReadVarInt32(blockBytes, ref cursor)
@@ -358,7 +357,11 @@ public static class NettraceReader
         return "Empty";
     }
 
-    static int MoveBy(ref int value, int by) => value += by; 
+    static int MoveBy(ref int value, int by)
+    {
+         value += by; 
+         return value;
+    }
 
     private static void Align(Stream stream)
     {
@@ -416,29 +419,39 @@ public static class NettraceReader
     private static int ReadVarInt32(Span<byte> bytes, ref int cursor)
     {
         int result = 0;
-        for (int byteIndex = 0; byteIndex < cursor + 5; ++byteIndex, ++cursor)
+        var maxIndex = 5;
+        for (int byteIndex = 0; byteIndex < maxIndex; ++byteIndex)
         {
-            int @byte = bytes[byteIndex];
-            if (@byte == 0)
-            {
-                break;
-            }
+            int @byte = bytes[cursor++];
+            //Console.WriteLine($"Byte: {@byte:b8}");
+            bool @break = (@byte & (1 << 7)) == 0;
+            @byte &= (1 << 7) - 1;
             @byte <<= 7 * byteIndex;
+            //Console.WriteLine($"Byte before writing: {@byte:b32}");
+            //Console.WriteLine($"Result before writing: {result:b32}");
             result |= @byte;
+            //Console.WriteLine($"Result: {result:b32}");
+            //Console.WriteLine($"Break: {@break}");
+            if (@break)
+                break;
         }
+        //Console.WriteLine($"Exit with result: {result} {result:b32}");
         return result;
     }
 
     private static long ReadVarInt64(Span<byte> bytes, ref int cursor)
     {
         long result = 0;
-        for (int byteIndex = 0; byteIndex < cursor + 9; ++byteIndex, ++cursor)
+        var maxIndex = 10;
+        for (int byteIndex = 0; byteIndex < maxIndex; ++byteIndex)
         {
-            long @byte = bytes[byteIndex];
-            if (@byte == 0)
-                break;
+            long @byte = bytes[cursor++];
+            bool @break = (@byte & (1 << 7)) == 0;
+            @byte &= (1 << 7) - 1;
             @byte <<= 7 * byteIndex;
             result |= @byte;
+            if (@break)
+                break;
         }
         return result;
     }
