@@ -53,6 +53,10 @@ public static class NettraceReader
             Payload
         );
     }
+    public record MetadataHeader(
+        int MetaDataId, string ProviderName, int EventId,
+        string EventName, long Keywords, int Version, int Level);
+    public record MetadataEvent(MetadataHeader Header); 
     public sealed record Block(int BlockSize, Header Header, EventBlob[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
     {
         private bool PrintMembers(StringBuilder builder)
@@ -276,6 +280,17 @@ public static class NettraceReader
             
             ReadOnlySpan<byte> payload = blockBytes[cursor..MoveBy(ref cursor, payloadSize)];
 
+            var payloadCursor = 0;
+            var payloadMetadataId = MemoryMarshal.Read<int>(payload[payloadCursor..MoveBy(ref payloadCursor, 4)]);
+            var providerName = ReadUnicode(payload, ref payloadCursor);
+            var eventId = MemoryMarshal.Read<int>(payload[payloadCursor..MoveBy(ref payloadCursor, 4)]);
+            var eventName = ReadUnicode(payload, ref payloadCursor);
+            long keywords = MemoryMarshal.Read<long>(payload[payloadCursor..MoveBy(ref payloadCursor, 8)]);
+            int version = MemoryMarshal.Read<int>(payload[payloadCursor..MoveBy(ref payloadCursor, 4)]);
+            int level = MemoryMarshal.Read<int>(payload[payloadCursor..MoveBy(ref payloadCursor, 4)]);
+
+            // reading 2 byte unicode.
+
             eventBlobs.Add(EventBlob.Create(flag, payload.ToArray(), in context));
         }
 
@@ -440,6 +455,13 @@ public static class NettraceReader
 
     private static Guid ReadGuid(Span<byte> bytes, ref int cursor)
         => MemoryMarshal.Read<Guid>(bytes[cursor..MoveBy(ref cursor, 16)]);
+
+    private static string ReadUnicode(ReadOnlySpan<byte> bytes, ref int cursor)
+    {
+        var length = bytes[cursor..].IndexOf([(byte)0, (byte)0]) + 1;
+        var providerNameBytes = bytes[cursor..MoveBy(ref cursor, length)];
+        return Encoding.Unicode.GetString(providerNameBytes);
+    }
 }
 
 internal static class Fmt
