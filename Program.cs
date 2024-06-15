@@ -24,21 +24,35 @@ public static class NettraceReader
         int NumberOfProcessors,
         int ExpectedCpuSamplingRate);
     public record Header(short HeaderSize, short Flags, long MinTimestamp, long MaxTimestamp, byte[] Reserved);
+    public readonly ref struct EventBlobParserContext(
+        int metadataId, int sequenceNumber, long captureThreadId, int processorNumber, long threadId, int stackId,
+        long timeStamp, Guid activityId, Guid relatedActivityId, bool isSorted, int payloadSize)
+    {
+        public readonly int MetadataId = metadataId;
+        public readonly int SequenceNumber = sequenceNumber;
+        public readonly long CaptureThreadId = captureThreadId;
+        public readonly int ProcessorNumber = processorNumber;
+        public readonly long ThreadId = threadId;
+        public readonly int StackId = stackId;
+        public readonly long TimeStamp = timeStamp;
+        public readonly Guid ActivityId = activityId;
+        public readonly Guid RelatedActivityId = relatedActivityId;
+        public readonly bool IsSorted = isSorted;
+        public readonly int PayloadSize = payloadSize;
+    }
     public record EventBlob(
-        byte Flags,
-        int MetadataId,
-        int SequenceNumber,
-        long CaptureThreadId,
-        int ProcessorNumber,
-        long ThreadId,
-        int StackId,
-        long TimeStamp,
-        Guid ActivityId,
-        Guid RelatedActivityId,
-        bool IsSorted,
-        int PayloadSize,
-        byte[] Payload
-    );
+        byte Flags, int MetadataId, int SequenceNumber, long CaptureThreadId, int ProcessorNumber, long ThreadId, int StackId,
+        long TimeStamp, Guid ActivityId, Guid RelatedActivityId, bool IsSorted, int PayloadSize, byte[] Payload
+    )
+    {
+        public static EventBlob Create(byte Flags, byte[] Payload, in EventBlobParserContext context) => new(
+            Flags,
+            context.MetadataId, context.SequenceNumber, context.CaptureThreadId,
+            context.ProcessorNumber, context.ThreadId, context.StackId,
+            context.TimeStamp, context.ActivityId, context.RelatedActivityId, context.IsSorted, context.PayloadSize,
+            Payload
+        );
+    }
     public sealed record Block(int BlockSize, Header Header, EventBlob[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
     {
         private bool PrintMembers(StringBuilder builder)
@@ -209,16 +223,7 @@ public static class NettraceReader
         // parsing event blobs
 
         // parser state for this block
-        int previousMetadataId = 0;
-        int previousSequenceNumber = 0;
-        long previousCaptureThreadId = 0;
-        int previousProcessorNumber = 0;
-        long previousThreadId = 0;
-        int previousStackId = 0;
-        long previousTimeStamp = 0;
-        Guid previousActivityId = Guid.Empty;
-        Guid previousRelatedActivityId = Guid.Empty;
-        int previousPayloadSize = 0;
+        EventBlobParserContext context = default; 
 
         // event blob
         var eventBlobs = new List<EventBlob>(100);
@@ -236,65 +241,45 @@ public static class NettraceReader
 
             var metadataId = firstBitIsSet
                 ? ReadVarInt32(blockBytes, ref cursor)
-                : previousMetadataId;
+                : context.MetadataId;
             var sequenceNumber = secondBitIsSet
-                ? ReadVarInt32(blockBytes, ref cursor) + previousSequenceNumber
-                : previousSequenceNumber;
+                ? ReadVarInt32(blockBytes, ref cursor) + context.SequenceNumber
+                : context.SequenceNumber;
             if (metadataId != 0)
             {
                 ++sequenceNumber;
             }
             long captureThreadId = secondBitIsSet
                 ? ReadVarInt64(blockBytes, ref cursor)
-                : previousCaptureThreadId;
+                : context.ThreadId;
             int processorNumber = secondBitIsSet
                 ? ReadVarInt32(blockBytes, ref cursor)
-                : previousProcessorNumber; 
+                : context.ProcessorNumber; 
             long threadId = thirdBitIsSet
                 ? ReadVarInt64(blockBytes, ref cursor)
-                : previousThreadId;
+                : context.ThreadId;
             int stackId = forthBitIsSet
                 ? ReadVarInt32(blockBytes, ref cursor)
-                : previousStackId;
-            long timeStamp = ReadVarInt64(blockBytes, ref cursor) + previousTimeStamp;
+                : context.StackId;
+            long timeStamp = ReadVarInt64(blockBytes, ref cursor) + context.TimeStamp;
             Guid activityId = fifthBitIsSet
                 ? ReadGuid(blockBytes, ref cursor)
-                : previousActivityId;
+                : context.ActivityId;
             Guid relatedActivityId = sixthBitIsSet
                 ? ReadGuid(blockBytes, ref cursor)
-                : previousRelatedActivityId;
+                : context.RelatedActivityId;
             bool isSorted = seventhBitIsSet;
             int payloadSize = eighthBitIsSet
                 ? ReadVarInt32(blockBytes, ref cursor)
-                : previousPayloadSize;
+                : context.PayloadSize;
 
-            previousMetadataId = metadataId;
-            previousSequenceNumber = sequenceNumber;
-            previousCaptureThreadId = captureThreadId;
-            previousProcessorNumber = processorNumber;
-            previousThreadId = threadId;
-            previousStackId = stackId;
-            previousTimeStamp = timeStamp;
-            previousActivityId = activityId;
-            previousRelatedActivityId = relatedActivityId;
-            previousPayloadSize = payloadSize;
+            context = new(
+                metadataId, sequenceNumber, captureThreadId, processorNumber, threadId, stackId,
+                timeStamp, activityId, relatedActivityId, isSorted, payloadSize);
             
             ReadOnlySpan<byte> payload = blockBytes[cursor..MoveBy(ref cursor, payloadSize)];
 
-            eventBlobs.Add(new(
-                flag,
-                metadataId,
-                sequenceNumber,
-                captureThreadId,
-                processorNumber,
-                threadId,
-                stackId,
-                timeStamp,
-                activityId,
-                relatedActivityId,
-                isSorted,
-                payloadSize,
-                payload.ToArray()));
+            eventBlobs.Add(EventBlob.Create(flag, payload.ToArray(), in context));
         }
 
         return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), [.. eventBlobs]);
