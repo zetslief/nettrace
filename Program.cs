@@ -431,19 +431,13 @@ public static class NettraceReader
         for (int byteIndex = 0; byteIndex < maxIndex; ++byteIndex)
         {
             int @byte = bytes[cursor++];
-            //Console.WriteLine($"Byte: {@byte:b8}");
             bool @break = (@byte & (1 << 7)) == 0;
             @byte &= (1 << 7) - 1;
             @byte <<= 7 * byteIndex;
-            //Console.WriteLine($"Byte before writing: {@byte:b32}");
-            //Console.WriteLine($"Result before writing: {result:b32}");
             result |= @byte;
-            //Console.WriteLine($"Result: {result:b32}");
-            //Console.WriteLine($"Break: {@break}");
             if (@break)
                 break;
         }
-        //Console.WriteLine($"Exit with result: {result} {result:b32}");
         return result;
     }
 
