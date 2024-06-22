@@ -40,12 +40,12 @@ public static class NettraceReader
         public readonly bool IsSorted = isSorted;
         public readonly int PayloadSize = payloadSize;
     }
-    public record EventBlob(
+    public record EventBlob<TPayload>(
         byte Flags, int MetadataId, int SequenceNumber, long CaptureThreadId, int ProcessorNumber, long ThreadId, int StackId,
-        long TimeStamp, Guid ActivityId, Guid RelatedActivityId, bool IsSorted, int PayloadSize, byte[] Payload
+        long TimeStamp, Guid ActivityId, Guid RelatedActivityId, bool IsSorted, int PayloadSize, TPayload Payload
     )
     {
-        public static EventBlob Create(byte Flags, byte[] Payload, in EventBlobParserContext context) => new(
+        public static EventBlob<TPayload> Create(byte Flags, TPayload Payload, in EventBlobParserContext context) => new(
             Flags,
             context.MetadataId, context.SequenceNumber, context.CaptureThreadId,
             context.ProcessorNumber, context.ThreadId, context.StackId,
@@ -57,7 +57,7 @@ public static class NettraceReader
         int MetaDataId, string ProviderName, int EventId,
         string EventName, long Keywords, int Version, int Level);
     public record MetadataEvent(MetadataHeader Header); 
-    public sealed record Block(int BlockSize, Header Header, EventBlob[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
+    public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
     {
         private bool PrintMembers(StringBuilder builder)
         {
@@ -120,25 +120,25 @@ public static class NettraceReader
         Object<Trace> trace = ReadObject(stream, TraceDecoder);
         Console.WriteLine(trace);
 
-        Object<Block> metadataBlock = ReadObject(stream, BlockDecoder);
+        Object<Block<MetadataEvent>> metadataBlock = ReadObject(stream, BlockDecoder(MetadataEventDecoder));
         Console.WriteLine(metadataBlock);
 
         Object<StackBlock> stackBlock = ReadObject(stream, StackBlockDecoder);
         Console.WriteLine(stackBlock);
 
-        Object<Block> eventBlock = ReadObject(stream, BlockDecoder);
+        Object<Block<byte[]>> eventBlock = ReadObject(stream, BlockDecoder(RawEventDecoder));
         Console.WriteLine(eventBlock);
 
-        Object<Block> anotherMetadataBlock = ReadObject(stream, BlockDecoder);
+        Object<Block<MetadataEvent>> anotherMetadataBlock = ReadObject(stream, BlockDecoder(MetadataEventDecoder));
         Console.WriteLine(anotherMetadataBlock);
 
-        Object<Block> anotherEventBlock = ReadObject(stream, BlockDecoder);
+        Object<Block<byte[]>> anotherEventBlock = ReadObject(stream, BlockDecoder(RawEventDecoder));
         Console.WriteLine(anotherEventBlock);
 
-        Object<Block> yetAnotherMetadataBlock = ReadObject(stream, BlockDecoder);
+        Object<Block<MetadataEvent>> yetAnotherMetadataBlock = ReadObject(stream, BlockDecoder(MetadataEventDecoder));
         Console.WriteLine(yetAnotherMetadataBlock);
 
-        Object<Block> yetAnotherEventBlock = ReadObject(stream, BlockDecoder);
+        Object<Block<byte[]>> yetAnotherEventBlock = ReadObject(stream, BlockDecoder(RawEventDecoder));
         Console.WriteLine(yetAnotherEventBlock);
 
         Object<SequencePointBlock> sequencePointBlock = ReadObject(stream, SequencePointBlockDecoder);
@@ -202,7 +202,9 @@ public static class NettraceReader
         );
     }
 
-    private static Block BlockDecoder(Stream stream)
+    public delegate T PayloadDecoder<T>(in ReadOnlySpan<byte> bytes);
+
+    private static Func<Stream, Block<T>> BlockDecoder<T>(PayloadDecoder<T> payloadDecoder) => (stream) => 
     {
         var blockSize = ReadInt32(stream);
         
@@ -230,7 +232,7 @@ public static class NettraceReader
         EventBlobParserContext context = default; 
 
         // event blob
-        var eventBlobs = new List<EventBlob>(100);
+        var eventBlobs = new List<EventBlob<T>>(100);
         while (cursor < blockBytes.Length)
         {
             var flag = blockBytes[cursor++];
@@ -280,22 +282,31 @@ public static class NettraceReader
             
             ReadOnlySpan<byte> payload = blockBytes[cursor..MoveBy(ref cursor, payloadSize)];
 
-            var payloadCursor = 0;
-            var payloadMetadataId = MemoryMarshal.Read<int>(payload[payloadCursor..MoveBy(ref payloadCursor, 4)]);
-            var providerName = ReadUnicode(payload, ref payloadCursor);
-            var eventId = MemoryMarshal.Read<int>(payload[payloadCursor..MoveBy(ref payloadCursor, 4)]);
-            var eventName = ReadUnicode(payload, ref payloadCursor);
-            long keywords = MemoryMarshal.Read<long>(payload[payloadCursor..MoveBy(ref payloadCursor, 8)]);
-            int version = MemoryMarshal.Read<int>(payload[payloadCursor..MoveBy(ref payloadCursor, 4)]);
-            int level = MemoryMarshal.Read<int>(payload[payloadCursor..MoveBy(ref payloadCursor, 4)]);
-
-            // reading 2 byte unicode.
-
-            eventBlobs.Add(EventBlob.Create(flag, payload.ToArray(), in context));
+            eventBlobs.Add(EventBlob<T>.Create(flag, payloadDecoder(in payload), in context));
         }
 
         return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), [.. eventBlobs]);
+    };
+
+    private static MetadataEvent MetadataEventDecoder(in ReadOnlySpan<byte> bytes)
+    {
+        int cursor = 0;
+
+        var payloadMetadataId = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+        var providerName = ReadUnicode(bytes, ref cursor);
+        var eventId = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+        var eventName = ReadUnicode(bytes, ref cursor);
+        long keywords = MemoryMarshal.Read<long>(bytes[cursor..MoveBy(ref cursor, 8)]);
+        int version = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+        int level = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+
+        var metadataEventHeader = new MetadataHeader(
+            payloadMetadataId, providerName, eventId, eventName, keywords, version, level);
+        return new(metadataEventHeader);
     }
+
+    private static byte[] RawEventDecoder(in ReadOnlySpan<byte> bytes)
+        => bytes.ToArray();
 
     private static StackBlock StackBlockDecoder(Stream stream)
     {
@@ -458,8 +469,16 @@ public static class NettraceReader
 
     private static string ReadUnicode(ReadOnlySpan<byte> bytes, ref int cursor)
     {
-        var length = bytes[cursor..].IndexOf([(byte)0, (byte)0]) + 1;
-        var providerNameBytes = bytes[cursor..MoveBy(ref cursor, length)];
+        var startCursor = cursor;
+        ReadOnlySpan<byte> nullBytes = [0, 0];
+        var nextByte = bytes[cursor..MoveBy(ref cursor, 2)];
+        while (nextByte[0] != nullBytes[0] || nextByte[1] != nullBytes[1])
+        {
+            nextByte = bytes[cursor..MoveBy(ref cursor, 2)];
+        }
+
+        var providerNameBytes = bytes[startCursor..(cursor - 2)];
+
         return Encoding.Unicode.GetString(providerNameBytes);
     }
 }
