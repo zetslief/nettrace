@@ -245,36 +245,20 @@ public static class NettraceReader
             var seventhBitIsSet = (flag & 64) != 0;
             var eighthBitIsSet = (flag & 128) != 0;
 
-            var metadataId = firstBitIsSet
-                ? ReadVarInt32(blockBytes, ref cursor)
-                : context.MetadataId;
+            var metadataId = firstBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.MetadataId;
             var sequenceNumber = secondBitIsSet
                 ? ReadVarInt32(blockBytes, ref cursor) + context.SequenceNumber
                 : context.SequenceNumber;
             sequenceNumber = metadataId == 0 ? sequenceNumber : sequenceNumber + 1;
-            long captureThreadId = secondBitIsSet
-                ? ReadVarInt64(blockBytes, ref cursor)
-                : context.ThreadId;
-            int processorNumber = secondBitIsSet
-                ? ReadVarInt32(blockBytes, ref cursor)
-                : context.ProcessorNumber; 
-            long threadId = thirdBitIsSet
-                ? ReadVarInt64(blockBytes, ref cursor)
-                : context.ThreadId;
-            int stackId = forthBitIsSet
-                ? ReadVarInt32(blockBytes, ref cursor)
-                : context.StackId;
+            long captureThreadId = secondBitIsSet ? ReadVarInt64(blockBytes, ref cursor) : context.ThreadId;
+            int processorNumber = secondBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.ProcessorNumber; 
+            long threadId = thirdBitIsSet ? ReadVarInt64(blockBytes, ref cursor) : context.ThreadId;
+            int stackId = forthBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.StackId;
             long timeStamp = ReadVarInt64(blockBytes, ref cursor) + context.TimeStamp;
-            Guid activityId = fifthBitIsSet
-                ? ReadGuid(blockBytes, ref cursor)
-                : context.ActivityId;
-            Guid relatedActivityId = sixthBitIsSet
-                ? ReadGuid(blockBytes, ref cursor)
-                : context.RelatedActivityId;
+            Guid activityId = fifthBitIsSet ? ReadGuid(blockBytes, ref cursor) : context.ActivityId;
+            Guid relatedActivityId = sixthBitIsSet ? ReadGuid(blockBytes, ref cursor) : context.RelatedActivityId;
             bool isSorted = seventhBitIsSet;
-            int payloadSize = eighthBitIsSet
-                ? ReadVarInt32(blockBytes, ref cursor)
-                : context.PayloadSize;
+            int payloadSize = eighthBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.PayloadSize;
 
             context = new(
                 metadataId, sequenceNumber, captureThreadId, processorNumber, threadId, stackId,
@@ -299,6 +283,42 @@ public static class NettraceReader
         long keywords = MemoryMarshal.Read<long>(bytes[cursor..MoveBy(ref cursor, 8)]);
         int version = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
         int level = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+
+        // if the metadata event specifies a V2Params tag, the event must have an empty V1 parameter FieldCount
+        // and no field definitions.
+        int fieldCount = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+        for (int fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex)
+        {
+            int typeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+            // TODO: payload description here
+            string fieldName = ReadUnicode(bytes, ref cursor);
+        }
+
+        // TODO: following things are available in V5 file format or later only
+        int tagPaylodBytes = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+        byte tagKind = bytes[cursor++];
+        // followed by tag payload
+        const byte opCode = 1;
+        const byte v2Params = 2;
+        switch (tagKind)
+        {
+            case opCode:
+                byte eventOpCode = bytes[cursor++];
+                break;
+            case v2Params:
+                int v2FieldCount = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor ,4)]);
+                int v2TypeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+                const int eventPipeTypeCodeArray = 19;
+                if (v2TypeCode == eventPipeTypeCodeArray)
+                {
+                    int arrayTypeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+                }
+                // TODO: payload description
+                string v2FieldName = ReadUnicode(bytes, ref cursor); 
+                break;
+            default:
+                throw new NotSupportedException($"Unknown tag kind: '{tagKind}'!");
+        }
 
         var metadataEventHeader = new MetadataHeader(
             payloadMetadataId, providerName, eventId, eventName, keywords, version, level);
