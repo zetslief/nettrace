@@ -56,7 +56,8 @@ public static class NettraceReader
     public record MetadataHeader(
         int MetaDataId, string ProviderName, int EventId,
         string EventName, long Keywords, int Version, int Level);
-    public record FieldV1(int TypeCode, byte[] Description, string FieldName);
+    public record FieldV1(int TypeCode, string FieldName);
+    public record FieldV2(int TypeCode, string FieldName);
     public record MetadataPayload(int FieldCount, FieldV1[] Fields);
     public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload);
     public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
@@ -295,14 +296,16 @@ public static class NettraceReader
         int version = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
         int level = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
 
+        var fieldsV1 = new List<FieldV1>();
+
         // if the metadata event specifies a V2Params tag, the event must have an empty V1 parameter FieldCount
         // and no field definitions.
         int fieldCount = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
         for (int fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex)
         {
             int typeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
-            // TODO: payload description here
             string fieldName = ReadUnicode(bytes, ref cursor);
+            fieldsV1.Add(new(typeCode, fieldName));
         }
 
         if (fileVersion >= 5)
@@ -331,11 +334,13 @@ public static class NettraceReader
                 default:
                     throw new NotSupportedException($"Unknown tag kind: '{tagKind}'!");
             }
+            throw new NotImplementedException($"V2 fields are not implemented yet!");
         }
 
         var metadataEventHeader = new MetadataHeader(
             payloadMetadataId, providerName, eventId, eventName, keywords, version, level);
-        return new(metadataEventHeader);
+        var metadataPayload = new MetadataPayload(fieldCount, [.. fieldsV1]);
+        return new(metadataEventHeader, metadataPayload);
     }
 
     private static byte[] RawEventDecoder(in ReadOnlySpan<byte> bytes)
