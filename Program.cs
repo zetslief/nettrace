@@ -56,7 +56,9 @@ public static class NettraceReader
     public record MetadataHeader(
         int MetaDataId, string ProviderName, int EventId,
         string EventName, long Keywords, int Version, int Level);
-    public record MetadataEvent(MetadataHeader Header); 
+    public record FieldV1(int TypeCode, byte[] Description, string FieldName);
+    public record MetadataPayload(int FieldCount, FieldV1[] Fields);
+    public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload); 
     public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
     {
         private bool PrintMembers(StringBuilder builder)
@@ -120,7 +122,9 @@ public static class NettraceReader
         Object<Trace> trace = ReadObject(stream, TraceDecoder);
         Console.WriteLine(trace);
 
-        Object<Block<MetadataEvent>> metadataBlock = ReadObject(stream, BlockDecoder(MetadataEventDecoder));
+        Object<Block<MetadataEvent>> metadataBlock = ReadObject(
+            stream,
+            BlockDecoder(CreateMetadataEventDecoder(trace.Type.Vesrion)));
         Console.WriteLine(metadataBlock);
 
         Object<StackBlock> stackBlock = ReadObject(stream, StackBlockDecoder);
@@ -129,13 +133,17 @@ public static class NettraceReader
         Object<Block<byte[]>> eventBlock = ReadObject(stream, BlockDecoder(RawEventDecoder));
         Console.WriteLine(eventBlock);
 
-        Object<Block<MetadataEvent>> anotherMetadataBlock = ReadObject(stream, BlockDecoder(MetadataEventDecoder));
+        Object<Block<MetadataEvent>> anotherMetadataBlock = ReadObject(
+            stream,
+            BlockDecoder(CreateMetadataEventDecoder(trace.Type.Vesrion)));
         Console.WriteLine(anotherMetadataBlock);
 
         Object<Block<byte[]>> anotherEventBlock = ReadObject(stream, BlockDecoder(RawEventDecoder));
         Console.WriteLine(anotherEventBlock);
 
-        Object<Block<MetadataEvent>> yetAnotherMetadataBlock = ReadObject(stream, BlockDecoder(MetadataEventDecoder));
+        Object<Block<MetadataEvent>> yetAnotherMetadataBlock = ReadObject(
+            stream,
+            BlockDecoder(CreateMetadataEventDecoder(trace.Type.Vesrion)));
         Console.WriteLine(yetAnotherMetadataBlock);
 
         Object<Block<byte[]>> yetAnotherEventBlock = ReadObject(stream, BlockDecoder(RawEventDecoder));
@@ -272,7 +280,10 @@ public static class NettraceReader
         return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), [.. eventBlobs]);
     };
 
-    private static MetadataEvent MetadataEventDecoder(in ReadOnlySpan<byte> bytes)
+    private static PayloadDecoder<MetadataEvent> CreateMetadataEventDecoder(int fileVersion)
+        => (in ReadOnlySpan<byte> bytes) => MetadataEventDecoder(in bytes, fileVersion);
+
+    private static MetadataEvent MetadataEventDecoder(in ReadOnlySpan<byte> bytes, int fileVersion)
     {
         int cursor = 0;
 
@@ -294,30 +305,32 @@ public static class NettraceReader
             string fieldName = ReadUnicode(bytes, ref cursor);
         }
 
-        // TODO: following things are available in V5 file format or later only
-        int tagPaylodBytes = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
-        byte tagKind = bytes[cursor++];
-        // followed by tag payload
-        const byte opCode = 1;
-        const byte v2Params = 2;
-        switch (tagKind)
+        if (fileVersion >= 5)
         {
-            case opCode:
-                byte eventOpCode = bytes[cursor++];
-                break;
-            case v2Params:
-                int v2FieldCount = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor ,4)]);
-                int v2TypeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
-                const int eventPipeTypeCodeArray = 19;
-                if (v2TypeCode == eventPipeTypeCodeArray)
-                {
-                    int arrayTypeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
-                }
-                // TODO: payload description
-                string v2FieldName = ReadUnicode(bytes, ref cursor); 
-                break;
-            default:
-                throw new NotSupportedException($"Unknown tag kind: '{tagKind}'!");
+            int tagPaylodBytes = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+            byte tagKind = bytes[cursor++];
+            // followed by tag payload
+            const byte opCode = 1;
+            const byte v2Params = 2;
+            switch (tagKind)
+            {
+                case opCode:
+                    byte eventOpCode = bytes[cursor++];
+                    break;
+                case v2Params:
+                    int v2FieldCount = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor ,4)]);
+                    int v2TypeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+                    const int eventPipeTypeCodeArray = 19;
+                    if (v2TypeCode == eventPipeTypeCodeArray)
+                    {
+                        int arrayTypeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+                    }
+                    // TODO: payload description
+                    string v2FieldName = ReadUnicode(bytes, ref cursor); 
+                    break;
+                default:
+                    throw new NotSupportedException($"Unknown tag kind: '{tagKind}'!");
+            }
         }
 
         var metadataEventHeader = new MetadataHeader(
