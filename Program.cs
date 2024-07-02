@@ -58,7 +58,7 @@ public static class NettraceReader
         string EventName, long Keywords, int Version, int Level);
     public record FieldV1(int TypeCode, byte[] Description, string FieldName);
     public record MetadataPayload(int FieldCount, FieldV1[] Fields);
-    public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload); 
+    public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload);
     public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
     {
         private bool PrintMembers(StringBuilder builder)
@@ -212,10 +212,10 @@ public static class NettraceReader
 
     public delegate T PayloadDecoder<T>(in ReadOnlySpan<byte> bytes);
 
-    private static Func<Stream, Block<T>> BlockDecoder<T>(PayloadDecoder<T> payloadDecoder) => (stream) => 
+    private static Func<Stream, Block<T>> BlockDecoder<T>(PayloadDecoder<T> payloadDecoder) => (stream) =>
     {
         var blockSize = ReadInt32(stream);
-        
+
         Align(stream);
 
         Span<byte> blockBytes = new byte[blockSize];
@@ -237,7 +237,7 @@ public static class NettraceReader
         // parsing event blobs
 
         // parser state for this block
-        EventBlobParserContext context = default; 
+        EventBlobParserContext context = default;
 
         // event blob
         var eventBlobs = new List<EventBlob<T>>(100);
@@ -259,7 +259,7 @@ public static class NettraceReader
                 : context.SequenceNumber;
             sequenceNumber = metadataId == 0 ? sequenceNumber : sequenceNumber + 1;
             long captureThreadId = secondBitIsSet ? ReadVarInt64(blockBytes, ref cursor) : context.ThreadId;
-            int processorNumber = secondBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.ProcessorNumber; 
+            int processorNumber = secondBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.ProcessorNumber;
             long threadId = thirdBitIsSet ? ReadVarInt64(blockBytes, ref cursor) : context.ThreadId;
             int stackId = forthBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.StackId;
             long timeStamp = ReadVarInt64(blockBytes, ref cursor) + context.TimeStamp;
@@ -271,7 +271,7 @@ public static class NettraceReader
             context = new(
                 metadataId, sequenceNumber, captureThreadId, processorNumber, threadId, stackId,
                 timeStamp, activityId, relatedActivityId, isSorted, payloadSize);
-            
+
             ReadOnlySpan<byte> payload = blockBytes[cursor..MoveBy(ref cursor, payloadSize)];
 
             eventBlobs.Add(EventBlob<T>.Create(flag, payloadDecoder(in payload), in context));
@@ -318,7 +318,7 @@ public static class NettraceReader
                     byte eventOpCode = bytes[cursor++];
                     break;
                 case v2Params:
-                    int v2FieldCount = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor ,4)]);
+                    int v2FieldCount = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
                     int v2TypeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
                     const int eventPipeTypeCodeArray = 19;
                     if (v2TypeCode == eventPipeTypeCodeArray)
@@ -326,7 +326,7 @@ public static class NettraceReader
                         int arrayTypeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
                     }
                     // TODO: payload description
-                    string v2FieldName = ReadUnicode(bytes, ref cursor); 
+                    string v2FieldName = ReadUnicode(bytes, ref cursor);
                     break;
                 default:
                     throw new NotSupportedException($"Unknown tag kind: '{tagKind}'!");
@@ -400,8 +400,8 @@ public static class NettraceReader
 
     static int MoveBy(ref int value, int by)
     {
-         value += by; 
-         return value;
+        value += by;
+        return value;
     }
 
     private static void Align(Stream stream)
