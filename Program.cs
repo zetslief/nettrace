@@ -58,7 +58,18 @@ public static class NettraceReader
         string EventName, long Keywords, int Version, int Level);
     public record FieldV1(int TypeCode, string FieldName);
     public record FieldV2(int TypeCode, string FieldName);
-    public record MetadataPayload(int FieldCount, FieldV1[] Fields);
+    public sealed record MetadataPayload(int FieldCount, FieldV1[] Fields)
+    {
+        private bool PrintMembers(StringBuilder builder)
+        {
+            builder.AppendLine($"MetadataPayload ({FieldCount} fields):");
+            foreach (var field in Fields)
+            {
+                builder.AppendLine($"\t\t{field}");
+            }
+            return true;
+        }
+    }
     public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload);
     public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
     {
