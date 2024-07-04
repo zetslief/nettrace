@@ -114,8 +114,16 @@ public static class NettraceReader
         }
     }
     public record Object<T>(Type Type, T Payload);
+    public record NettraceFile(
+        string Magic,
+        Trace Trace,
+        Block<MetadataEvent>[] MetadataBlocks,
+        Block<byte[]>[] EventBlocks,
+        StackBlock StackBlock,
+        SequencePointBlock SequencePointBlock
+    );
 
-    public static void Read(Stream stream)
+    public static NettraceFile Read(Stream stream)
     {
         Span<byte> magic = stackalloc byte[8];
         stream.ReadExactly(magic);
@@ -164,6 +172,13 @@ public static class NettraceReader
 
         Tag nullTag = ReadTag(stream);
         Console.WriteLine($"Stream ends with {nullTag}");
+        return new(
+            Encoding.UTF8.GetString(magic),
+            trace.Payload,
+            [metadataBlock.Payload, anotherMetadataBlock.Payload, yetAnotherMetadataBlock.Payload],
+            [eventBlock.Payload, anotherEventBlock.Payload, yetAnotherEventBlock.Payload],
+            stackBlock.Payload,
+            sequencePointBlock.Payload);
     }
 
     private static Object<T> ReadObject<T>(Stream stream, Func<Stream, T> payloadDecoder)
