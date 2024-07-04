@@ -1,9 +1,7 @@
-﻿using System.Text;
+using System.Text;
 using System.Runtime.InteropServices;
 
-var filePath = args[0];
-using var file = File.OpenRead(filePath);
-NettraceReader.Read(file);
+namespace Nettrace;
 
 public static class NettraceReader
 {
@@ -422,7 +420,7 @@ public static class NettraceReader
 
     private static void Align(Stream stream)
     {
-        var padding = (4 - (stream.Position % 4)) % 4;
+        var padding = (4 - stream.Position % 4) % 4;
         stream.Seek(padding, SeekOrigin.Current);
     }
 
@@ -480,7 +478,7 @@ public static class NettraceReader
         for (int byteIndex = 0; byteIndex < maxIndex; ++byteIndex)
         {
             int @byte = bytes[cursor++];
-            bool @break = (@byte & (1 << 7)) == 0;
+            bool @break = (@byte & 1 << 7) == 0;
             @byte &= (1 << 7) - 1;
             @byte <<= 7 * byteIndex;
             result |= @byte;
@@ -497,7 +495,7 @@ public static class NettraceReader
         for (int byteIndex = 0; byteIndex < maxIndex; ++byteIndex)
         {
             long @byte = bytes[cursor++];
-            bool @break = (@byte & (1 << 7)) == 0;
+            bool @break = (@byte & 1 << 7) == 0;
             @byte &= (1 << 7) - 1;
             @byte <<= 7 * byteIndex;
             result |= @byte;
