@@ -69,6 +69,7 @@ public static class NettraceReader
         }
     }
     public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload);
+    public record Event(string Content);
     public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
     {
         private bool PrintMembers(StringBuilder builder)
@@ -118,7 +119,7 @@ public static class NettraceReader
         string Magic,
         Trace Trace,
         Block<MetadataEvent>[] MetadataBlocks,
-        Block<byte[]>[] EventBlocks,
+        Block<Event>[] EventBlocks,
         StackBlock StackBlock,
         SequencePointBlock SequencePointBlock
     );
@@ -148,7 +149,7 @@ public static class NettraceReader
         Object<StackBlock> stackBlock = ReadObject(stream, StackBlockDecoder);
         Console.WriteLine(stackBlock);
 
-        Object<Block<byte[]>> eventBlock = ReadObject(stream, BlockDecoder(RawEventDecoder));
+        Object<Block<Event>> eventBlock = ReadObject(stream, BlockDecoder(EventDecoder));
         Console.WriteLine(eventBlock);
 
         Object<Block<MetadataEvent>> anotherMetadataBlock = ReadObject(
@@ -156,7 +157,7 @@ public static class NettraceReader
             BlockDecoder(CreateMetadataEventDecoder(trace.Type.Vesrion)));
         Console.WriteLine(anotherMetadataBlock);
 
-        Object<Block<byte[]>> anotherEventBlock = ReadObject(stream, BlockDecoder(RawEventDecoder));
+        Object<Block<Event>> anotherEventBlock = ReadObject(stream, BlockDecoder(EventDecoder));
         Console.WriteLine(anotherEventBlock);
 
         Object<Block<MetadataEvent>> yetAnotherMetadataBlock = ReadObject(
@@ -164,7 +165,7 @@ public static class NettraceReader
             BlockDecoder(CreateMetadataEventDecoder(trace.Type.Vesrion)));
         Console.WriteLine(yetAnotherMetadataBlock);
 
-        Object<Block<byte[]>> yetAnotherEventBlock = ReadObject(stream, BlockDecoder(RawEventDecoder));
+        Object<Block<Event>> yetAnotherEventBlock = ReadObject(stream, BlockDecoder(EventDecoder));
         Console.WriteLine(yetAnotherEventBlock);
 
         Object<SequencePointBlock> sequencePointBlock = ReadObject(stream, SequencePointBlockDecoder);
@@ -352,7 +353,7 @@ public static class NettraceReader
                     {
                         int arrayTypeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
                     }
-                    // TODO: payload description
+                    // TODO: payload description (it also may be that description does not exist :))
                     string v2FieldName = ReadUnicode(bytes, ref cursor);
                     break;
                 default:
@@ -365,6 +366,12 @@ public static class NettraceReader
             payloadMetadataId, providerName, eventId, eventName, keywords, version, level);
         var metadataPayload = new MetadataPayload(fieldCount, [.. fieldsV1]);
         return new(metadataEventHeader, metadataPayload);
+    }
+
+    private static Event EventDecoder(in ReadOnlySpan<byte> bytes)
+    {
+        int cursor = 0;
+        return new Event(ReadUnicode(bytes, ref cursor));
     }
 
     private static byte[] RawEventDecoder(in ReadOnlySpan<byte> bytes)

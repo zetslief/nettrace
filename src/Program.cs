@@ -14,11 +14,13 @@ Console.WriteLine($"EventPipe event count: {eventCount}");
 static int UseEventPipe(string filePath)
 {
     using var eventSource = new EventPipeEventSource(filePath);
+    var versions = new HashSet<int>();
     int eventCount = 0; 
     eventSource.AllEvents += (@event) =>
     {
         ++eventCount;
     };
     eventSource.Process();
+    Console.WriteLine($"Versions of the events: {string.Join(',', versions)}");
     return eventCount;
 }
