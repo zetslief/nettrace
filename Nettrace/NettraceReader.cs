@@ -69,7 +69,7 @@ public static class NettraceReader
         }
     }
     public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload);
-    public record Event(string Content);
+    public record Event(byte[] Bytes);
     public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
     {
         private bool PrintMembers(StringBuilder builder)
@@ -173,6 +173,7 @@ public static class NettraceReader
 
         Tag nullTag = ReadTag(stream);
         Console.WriteLine($"Stream ends with {nullTag}");
+
         return new(
             Encoding.UTF8.GetString(magic),
             trace.Payload,
@@ -368,11 +369,7 @@ public static class NettraceReader
         return new(metadataEventHeader, metadataPayload);
     }
 
-    private static Event EventDecoder(in ReadOnlySpan<byte> bytes)
-    {
-        int cursor = 0;
-        return new Event(ReadUnicode(bytes, ref cursor));
-    }
+    private static Event EventDecoder(in ReadOnlySpan<byte> bytes) => new(bytes.ToArray());
 
     private static byte[] RawEventDecoder(in ReadOnlySpan<byte> bytes)
         => bytes.ToArray();
