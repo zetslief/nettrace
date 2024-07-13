@@ -1,9 +1,10 @@
 using Nettrace;
 using Microsoft.Diagnostics.Tracing;
+using static Nettrace.NettraceReader;
 
 var filePath = args[0];
 
-var nettraceFile = NettraceReader.Read(File.OpenRead(filePath));
+NettraceReader.NettraceFile? nettraceFile = NettraceReader.Read(File.OpenRead(filePath));
 var eventCount = UseEventPipe(filePath);
 
 var nettraceEventCount = nettraceFile.EventBlocks.Sum((blob) => blob.EventBlobs.Length);
