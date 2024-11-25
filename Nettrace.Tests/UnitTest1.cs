@@ -1,4 +1,4 @@
-using Nettrace;
+using Microsoft.Diagnostics.Tracing;
 
 namespace Nettrace.Tests;
 
@@ -7,9 +7,23 @@ public class NettraceReaderTest
     const string filePath = "perf.nettrace";
 
     [Fact]
-    public void Test1()
+    public void TestEventCount()
     {
-        Assert.True(File.Exists(filePath));
+        int expectedCount = 0;
+        UsingEventPipe(onEvent: _ => ++expectedCount);
+        NettraceReader.NettraceFile? nettraceFile = NettraceReader.Read(File.OpenRead(filePath));
+        var actualCount = nettraceFile.EventBlocks.Sum(blob => blob.EventBlobs.Length);
+        Assert.Equal(expectedCount, actualCount);
+    }
+
+    private static void UsingEventPipe(Action<TraceEvent>? onEvent = null, Action<TraceEvent>? onUnhandledEvent = null)
+    {
+        static void Ignore(TraceEvent @event) {}
+
+        using var eventSource = new EventPipeEventSource(filePath);
+        eventSource.AllEvents += onEvent ?? Ignore;
+        eventSource.UnhandledEvents += onUnhandledEvent ?? Ignore;
+        eventSource.Process();
     }
 }
 /*

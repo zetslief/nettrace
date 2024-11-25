@@ -21,7 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="../perf.nettrace" CopyToOutputDirectory="PreserveNewest"/>
+    <None Include="../perf.nettrace" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nettrace\Nettrace.csproj" />
   </ItemGroup>
 
 </Project>
