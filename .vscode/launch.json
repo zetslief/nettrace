@@ -9,7 +9,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/bin/Debug/net8.0/nettrace.dll",
+            "program": "${workspaceFolder}/Playground/bin/Debug/net8.0/Playground.dll",
             "args": ["perf.nettrace"],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
 
 namespace Nettrace;
 
@@ -70,7 +71,7 @@ public static class NettraceReader
     }
     public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload);
     public record Event(byte[] Bytes);
-    public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs) // MetaddtaaBlock block uses the same layout as EventBlock 
+    public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs) // MetdataBlock uses the same layout as EventBlock 
     {
         private bool PrintMembers(StringBuilder builder)
         {
@@ -138,50 +139,75 @@ public static class NettraceReader
         Console.Write("StreamHeader: ");
         Console.WriteLine(streamHeader);
 
-        Object<Trace> trace = ReadObject(stream, TraceDecoder);
-        Console.WriteLine(trace);
+        Trace? trace = null;
+        Type? traceType = null;
+        StackBlock? stack = null;
+        List<Block<MetadataEvent>> metadataBlocks = [];
+        List<Block<Event>> eventBlocks = [];
+        SequencePointBlock? sequencePointBlock = null;
 
-        Object<Block<MetadataEvent>> metadataBlock = ReadObject(
-            stream,
-            BlockDecoder(CreateMetadataEventDecoder(trace.Type.Vesrion)));
-        Console.WriteLine(metadataBlock);
-
-        Object<StackBlock> stackBlock = ReadObject(stream, StackBlockDecoder);
-        Console.WriteLine(stackBlock);
-
-        Object<Block<Event>> eventBlock = ReadObject(stream, BlockDecoder(EventDecoder));
-        Console.WriteLine(eventBlock);
-
-        Object<Block<MetadataEvent>> anotherMetadataBlock = ReadObject(
-            stream,
-            BlockDecoder(CreateMetadataEventDecoder(trace.Type.Vesrion)));
-        Console.WriteLine(anotherMetadataBlock);
-
-        Object<Block<Event>> anotherEventBlock = ReadObject(stream, BlockDecoder(EventDecoder));
-        Console.WriteLine(anotherEventBlock);
-
-        Object<Block<MetadataEvent>> yetAnotherMetadataBlock = ReadObject(
-            stream,
-            BlockDecoder(CreateMetadataEventDecoder(trace.Type.Vesrion)));
-        Console.WriteLine(yetAnotherMetadataBlock);
-
-        Object<Block<Event>> yetAnotherEventBlock = ReadObject(stream, BlockDecoder(EventDecoder));
-        Console.WriteLine(yetAnotherEventBlock);
-
-        Object<SequencePointBlock> sequencePointBlock = ReadObject(stream, SequencePointBlockDecoder);
-        Console.WriteLine(sequencePointBlock);
-
-        Tag nullTag = ReadTag(stream);
-        Console.WriteLine($"Stream ends with {nullTag}");
+        while (TryStartObject(stream, out var type))
+        {
+            switch (type!.Name)
+            {
+                case "Trace":
+                    traceType = type;
+                    trace = TraceDecoder(stream);
+                    Console.WriteLine(type);
+                    Console.WriteLine(trace);
+                    break;
+                case "MetadataBlock":
+                    Debug.Assert(traceType is not null);
+                    var metadataDecoder = BlockDecoder(CreateMetadataEventDecoder(traceType!.Vesrion));
+                    var metadata = metadataDecoder(stream);
+                    metadataBlocks.Add(metadata);
+                    break;
+                case "StackBlock":
+                    stack = StackBlockDecoder(stream);
+                    break;
+                case "EventBlock":
+                    var eventBlockDecoder = BlockDecoder(EventDecoder); 
+                    var @event = eventBlockDecoder(stream);
+                    eventBlocks.Add(@event);
+                    break;
+                case "SPBlock":
+                    sequencePointBlock = SequencePointBlockDecoder(stream);
+                    break;
+                default:
+                    throw new NotImplementedException($"Unknown object type: {type}");
+            }
+            FinishObject(stream);
+        }
 
         return new(
             Encoding.UTF8.GetString(magic),
-            trace.Payload,
-            [metadataBlock.Payload, anotherMetadataBlock.Payload, yetAnotherMetadataBlock.Payload],
-            [eventBlock.Payload, anotherEventBlock.Payload, yetAnotherEventBlock.Payload],
-            stackBlock.Payload,
-            sequencePointBlock.Payload);
+            trace,
+            [.. metadataBlocks],
+            [.. eventBlocks],
+            stack,
+            sequencePointBlock);
     }
+
+    private static bool TryStartObject(Stream stream, out Type? type)
+    {
+        var tag = ReadTag(stream);
+        if (tag == Tag.BeginPrivateObject)
+        {
+            type = ReadType(stream);
+            return true;
+        }
+        else
+        {
+            Debug.Assert(tag == Tag.NullReference);
+            type = null;
+            return false;
+        }
+    }
+
+    private static void FinishObject(Stream stream)
+    {
+        var _endObject = ReadTag(stream);
+    } 
 
     private static Object<T> ReadObject<T>(Stream stream, Func<Stream, T> payloadDecoder)
     {

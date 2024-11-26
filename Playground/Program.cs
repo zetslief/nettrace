@@ -1,2 +1,3 @@
-﻿
-Console.WriteLine("Hello, Playground!");
+﻿using Nettrace;
+
+NettraceReader.Read(File.OpenRead(args[0]));
