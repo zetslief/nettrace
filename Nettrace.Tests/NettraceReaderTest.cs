@@ -2,7 +2,7 @@ using Microsoft.Diagnostics.Tracing;
 
 namespace Nettrace.Tests;
 
-public class NettraceReaderTest
+public sealed class NettraceReaderTest
 {
     const string filePath = "perf.nettrace";
 
@@ -13,7 +13,19 @@ public class NettraceReaderTest
         UsingEventPipe(onEvent: _ => ++expectedCount);
         NettraceReader.NettraceFile? nettraceFile = NettraceReader.Read(File.OpenRead(filePath));
         var actualCount = nettraceFile.EventBlocks.Sum(blob => blob.EventBlobs.Length);
+
         Assert.Equal(expectedCount, actualCount);
+    }
+
+    [Fact]
+    public void TestPaylaodLength()
+    {
+        List<int> exp = [];
+        UsingEventPipe(onEvent: @event => exp.Add(@event.EventData().Length));
+        NettraceReader.NettraceFile? nettraceFile = NettraceReader.Read(File.OpenRead(filePath));
+        var actualSequenceNumbers = nettraceFile.EventBlocks.SelectMany(blob => blob.EventBlobs).Select(blob => blob.PayloadSize).ToArray();
+
+        Assert.Equal(exp, actualSequenceNumbers);
     }
 
     private static void UsingEventPipe(Action<TraceEvent>? onEvent = null, Action<TraceEvent>? onUnhandledEvent = null)
@@ -26,32 +38,3 @@ public class NettraceReaderTest
         eventSource.Process();
     }
 }
-/*
-using Nettrace;
-using Microsoft.Diagnostics.Tracing;
-using static Nettrace.NettraceReader;
-
-var filePath = args[0];
-
-NettraceReader.NettraceFile? nettraceFile = NettraceReader.Read(File.OpenRead(filePath));
-var eventCount = UseEventPipe(filePath);
-
-var nettraceEventCount = nettraceFile.EventBlocks.Sum((blob) => blob.EventBlobs.Length);
-
-Console.WriteLine($"Nettrace event count: {nettraceEventCount}");
-Console.WriteLine($"EventPipe event count: {eventCount}");
-
-static int UseEventPipe(string filePath)
-{
-    using var eventSource = new EventPipeEventSource(filePath);
-    var versions = new HashSet<int>();
-    int eventCount = 0; 
-    eventSource.AllEvents += (@event) =>
-    {
-        ++eventCount;
-    };
-    eventSource.Process();
-    Console.WriteLine($"Versions of the events: {string.Join(',', versions)}");
-    return eventCount;
-}
-*/
