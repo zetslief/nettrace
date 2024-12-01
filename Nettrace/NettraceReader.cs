@@ -181,11 +181,11 @@ public static class NettraceReader
 
         return new(
             Encoding.UTF8.GetString(magic),
-            trace,
+            trace ?? throw new InvalidOperationException("File doesn't contain trace."),
             [.. metadataBlocks],
             [.. eventBlocks],
-            stack,
-            sequencePointBlock);
+            stack ?? throw new InvalidOperationException("File doesn't contain stack."),
+            sequencePointBlock ?? throw new InvalidOperationException("File dosn't contain SPB."));
     }
 
     private static bool TryStartObject(Stream stream, out Type? type)
