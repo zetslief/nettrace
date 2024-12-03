@@ -8,13 +8,13 @@ var stopwatch = Stopwatch.StartNew();
 var trace = NettraceReader.Read(File.OpenRead(filepath));
 stopwatch.Stop();
 
-Dictionary<int, NettraceReader.MetadataHeader>  metadataStorage = [];
+Dictionary<int, NettraceReader.MetadataEvent>  metadataStorage = [];
 
 foreach (var metadataBlock in trace.MetadataBlocks)
 {
     foreach (var blob in metadataBlock.EventBlobs)
     {
-        metadataStorage[blob.Payload.Header.MetaDataId] = blob.Payload.Header;
+        metadataStorage[blob.Payload.Header.MetaDataId] = blob.Payload;
     }
 }
 
@@ -24,7 +24,12 @@ foreach (var eventBlock in trace.EventBlocks)
 {
     foreach (var blob in eventBlock.EventBlobs)
     {
-        WriteLine($"{metadataStorage.ContainsKey(blob.MetadataId)} | {blob}");
+        var metadata = metadataStorage[blob.MetadataId];
+        if (metadata.Header.ProviderName == "ProfileMe")
+        {
+            var dateTime = DateTime.FromFileTime(BitConverter.ToInt64(blob.Payload.Bytes));
+            WriteLine($"{(System.TypeCode)metadata.Payload.Fields[0].TypeCode} {dateTime}");
+        }
     }
 }
 
