@@ -20,6 +20,9 @@ foreach (var metadataBlock in trace.MetadataBlocks)
 
 WriteLine("---------");
 
+TimeSpan delta = TimeSpan.Zero;
+int counter = 0;
+TimeOnly? previous = null;
 foreach (var eventBlock in trace.EventBlocks)
 {
     foreach (var blob in eventBlock.EventBlobs)
@@ -28,10 +31,16 @@ foreach (var eventBlock in trace.EventBlocks)
         if (metadata.Header.ProviderName == "ProfileMe")
         {
             var dateTime = DateTime.FromFileTime(BitConverter.ToInt64(blob.Payload.Bytes));
-            WriteLine($"{(System.TypeCode)metadata.Payload.Fields[0].TypeCode} {dateTime}");
+            var time = TimeOnly.FromDateTime(dateTime);
+            delta += (previous ?? time) - time;
+            previous = time;
+            ++counter;
+            WriteLine($"{(System.TypeCode)metadata.Payload.Fields[0].TypeCode} {dateTime}.{dateTime.Millisecond}ms.{dateTime.Microsecond}us");
         }
     }
 }
+
+WriteLine($"Average delay between events: {delta / counter}");
 
 foreach (var header in metadataStorage.Values)
 {
