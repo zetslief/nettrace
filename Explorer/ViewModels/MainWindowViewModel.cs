@@ -6,21 +6,16 @@ using System.Windows.Input;
 using Nettrace;
 using ReactiveUI;
 
-using MetadataBlock = Nettrace.NettraceReader.Block<Nettrace.NettraceReader.MetadataEvent>;
+using MetadataBlock = Nettrace.NettraceReader.EventBlob<Nettrace.NettraceReader.MetadataEvent>;
 using EventBlock = Nettrace.NettraceReader.Block<Nettrace.NettraceReader.Event>;
 
 namespace Explorer.ViewModels;
 
-public class MetadataViewModel(MetadataBlock metadataBlock)
+public class MetadataBlobViewModel(MetadataBlock metadata)
 {
-    private readonly MetadataBlock metadataBlock = metadataBlock;
+    public MetadataBlock Block { get; } = metadata;
 
-    public MetadataBlock Block => metadataBlock;
-
-    public override string ToString()
-    {
-        return metadataBlock.ToString();
-    }
+    public override string ToString() => Block.ToString();
 }
 
 public class EventViewModel(EventBlock metadataBlock)
@@ -40,8 +35,8 @@ public class MainWindowViewModel : ReactiveObject
     private string? filePath = "./../perf.nettrace";
     private string status = string.Empty;
 
-    private MetadataViewModel[]? metadataBlocks = null;
-    private MetadataViewModel? selectedMetadataBlock = null; 
+    private MetadataBlobViewModel[]? metadataBlocks = null;
+    private MetadataBlobViewModel? selectedMetadataBlock = null; 
 
     private IEnumerable<EventViewModel>? allEventBlocks = null;
     private IEnumerable<EventViewModel>? eventBlocks = null;
@@ -53,7 +48,7 @@ public class MainWindowViewModel : ReactiveObject
             .Subscribe(RefreshEventBlocks);
     }
 
-    private void RefreshEventBlocks(MetadataViewModel? model)
+    private void RefreshEventBlocks(MetadataBlobViewModel? model)
     {
         Console.WriteLine($"Selected: {model?.Block}");
 
@@ -63,10 +58,10 @@ public class MainWindowViewModel : ReactiveObject
             return;
         }
 
-        var metadataIds = model.Block.EventBlobs.Select(b => b.Payload.Header.MetaDataId).ToHashSet();
-        Console.WriteLine($"Metadata IDs: {string.Join(',', metadataIds)}");
+        var metadataId = model.Block.Payload.Header.MetaDataId;
+        Console.WriteLine($"Metadata IDs: {string.Join(',', metadataId)}");
         EventBlocks = allEventBlocks?
-            .Where(b => b.Block.EventBlobs.Any(p => metadataIds.Contains(p.MetadataId)))
+            .Where(b => b.Block.EventBlobs.Any(p => metadataId == p.MetadataId))
             .ToArray();
     }
 
@@ -78,13 +73,13 @@ public class MainWindowViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref filePath, value);
     }
 
-    public MetadataViewModel[]? MetadataBlocks
+    public MetadataBlobViewModel[]? MetadataBlocks
     {
         get => metadataBlocks;
         private set => this.RaiseAndSetIfChanged(ref metadataBlocks, value);
     }
 
-    public MetadataViewModel? SelectedMetadataBlock
+    public MetadataBlobViewModel? SelectedMetadataBlock
     {
         get => selectedMetadataBlock;
         set => this.RaiseAndSetIfChanged(ref selectedMetadataBlock, value);
@@ -120,7 +115,9 @@ public class MainWindowViewModel : ReactiveObject
         using var stream =  File.Open(path, FileMode.Open);
         var nettrace = NettraceReader.Read(stream);
         allEventBlocks = nettrace.EventBlocks.Select(b => new EventViewModel(b)).ToArray();
-        MetadataBlocks = nettrace.MetadataBlocks.Select(b => new MetadataViewModel(b)).ToArray();
+        MetadataBlocks = nettrace.MetadataBlocks.SelectMany(s => s.EventBlobs)
+            .Select(s => new MetadataBlobViewModel(s))
+            .ToArray();
         Status = $"Read {stream.Position} bytes";
     }
 }
