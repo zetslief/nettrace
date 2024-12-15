@@ -1,16 +1,45 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows.Input;
+using Nettrace;
 using ReactiveUI;
 
+using MetadataBlock = Nettrace.NettraceReader.Block<Nettrace.NettraceReader.MetadataEvent>;
+using EventBlock = Nettrace.NettraceReader.Block<Nettrace.NettraceReader.Event>;
+
 namespace Explorer.ViewModels;
+
+public class MetadataViewModel(MetadataBlock metadataBlock)
+{
+    private readonly MetadataBlock metadataBlock = metadataBlock;
+
+    public override string ToString()
+    {
+        return metadataBlock.ToString();
+    }
+}
+
+public class EventViewModel(EventBlock metadataBlock)
+{
+    private readonly EventBlock eventBlock = metadataBlock;
+
+    public override string ToString()
+    {
+        return eventBlock.ToString();
+    }
+}
 
 public class MainWindowViewModel : ReactiveObject
 {
     private string? filePath = "./../perf.nettrace";
-    private string metadataBlockContent = string.Empty;
-    private string eventBlockContext = string.Empty;
+    private string status = string.Empty;
+
+    private MetadataViewModel[]? metadataBlocks = null;
+    private MetadataViewModel? selectedMetadataBlock = null; 
+
+    private IEnumerable<EventViewModel>? eventBlocks = null;
 
     public MainWindowViewModel()
     {
@@ -25,16 +54,28 @@ public class MainWindowViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref filePath, value);
     }
 
-    public string MetadataBlockContent
+    public MetadataViewModel[]? MetadataBlocks
     {
-        get => metadataBlockContent;
-        set => this.RaiseAndSetIfChanged(ref metadataBlockContent, value);
+        get => metadataBlocks;
+        private set => this.RaiseAndSetIfChanged(ref metadataBlocks, value);
     }
 
-    public string EventBlockContent
+    public MetadataViewModel? SelectedMetadataBlock
     {
-        get => metadataBlockContent;
-        set => this.RaiseAndSetIfChanged(ref metadataBlockContent, value);
+        get => selectedMetadataBlock;
+        set => this.RaiseAndSetIfChanged(ref selectedMetadataBlock, value);
+    }
+
+    public IEnumerable<EventViewModel>? EventBlocks
+    {
+        get => eventBlocks;
+        set => this.RaiseAndSetIfChanged(ref eventBlocks, value);
+    }
+
+    public string Status
+    {
+        get => status;
+        private set => this.RaiseAndSetIfChanged(ref status, value);
     }
 
     private void OnCommand()
@@ -48,11 +89,14 @@ public class MainWindowViewModel : ReactiveObject
 
         if (!File.Exists(path))
         {
-            MetadataBlockContent = $"File not found: {path}";
+            Status = $"File not found: {path}";
+            return;
         }
 
-        var nettrace = Nettrace.NettraceReader.Read(File.Open(path, FileMode.Open));
-        MetadataBlockContent = nettrace.MetadataBlocks.Select(b => b.ToString()).Aggregate((block, acc) => $"{acc}{Environment.NewLine}{block}");
-        EventBlockContent = nettrace.EventBlocks.Select(b => b.ToString()).Aggregate((block, acc) => $"{acc}{Environment.NewLine}{block}");
+        using var stream =  File.Open(path, FileMode.Open);
+        var nettrace = NettraceReader.Read(stream);
+        MetadataBlocks = nettrace.MetadataBlocks.Select(b => new MetadataViewModel(b)).ToArray();
+        EventBlocks = nettrace.EventBlocks.Select(b => new EventViewModel(b)).ToArray();
+        Status = $"Read {stream.Position} bytes";
     }
 }

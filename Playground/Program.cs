@@ -49,6 +49,3 @@ foreach (var header in metadataStorage.Values)
 }
 
 WriteLine($"File was read in {stopwatch.Elapsed}");
-
-
-static void 

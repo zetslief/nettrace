@@ -21,12 +21,24 @@
             <Button Command="{Binding WelcomeCommand}"
                 Content="Read"/>
         </StackPanel>
-        <TextBox Text="{Binding MetadataBlockContent}"
+        <ListBox ItemsSource="{Binding MetadataBlocks}"
+            SelectedItem="SelectedMetadataBlock"
             Grid.Row="1"
-            Grid.Column="0"/>
-        <TextBox Text="{Binding EventBlockContent}"
-            IsReadOnly="True"
+            Grid.Column="0">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <ListBox ItemsSource="{Binding EventBlocks}"
             Grid.Row="1"
-            Grid.Column="1"/>
+            Grid.Column="1">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
     </Grid>
 </Window>
