@@ -40,7 +40,8 @@ foreach (var eventBlock in trace.EventBlocks)
     }
 }
 
-WriteLine($"Average delay between events: {delta / counter}");
+if (counter > 0)
+    WriteLine($"Average delay between events: {delta / counter}");
 
 foreach (var header in metadataStorage.Values)
 {
@@ -48,3 +49,6 @@ foreach (var header in metadataStorage.Values)
 }
 
 WriteLine($"File was read in {stopwatch.Elapsed}");
+
+
+static void 
