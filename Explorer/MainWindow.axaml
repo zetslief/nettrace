@@ -29,9 +29,8 @@
             Grid.Column="0">
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <Panel>
-                        <TextBlock Text="{Binding}" />
-                    </Panel>
+                    <TextBlock Text="{Binding}"
+                        TextWrapping="Wrap"/>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
@@ -40,7 +39,8 @@
             Grid.Column="1">
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <TextBlock Text="{Binding}" />
+                    <TextBlock Text="{Binding}"
+                        TextWrapping="Wrap"/>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
