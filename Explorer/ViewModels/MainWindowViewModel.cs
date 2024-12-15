@@ -7,7 +7,7 @@ using Nettrace;
 using ReactiveUI;
 
 using MetadataBlock = Nettrace.NettraceReader.EventBlob<Nettrace.NettraceReader.MetadataEvent>;
-using EventBlock = Nettrace.NettraceReader.Block<Nettrace.NettraceReader.Event>;
+using EventBlock = Nettrace.NettraceReader.EventBlob<Nettrace.NettraceReader.Event>;
 
 namespace Explorer.ViewModels;
 
@@ -61,7 +61,7 @@ public class MainWindowViewModel : ReactiveObject
         var metadataId = model.Block.Payload.Header.MetaDataId;
         Console.WriteLine($"Metadata IDs: {string.Join(',', metadataId)}");
         EventBlocks = allEventBlocks?
-            .Where(b => b.Block.EventBlobs.Any(p => metadataId == p.MetadataId))
+            .Where(b => b.Block.MetadataId == metadataId)
             .ToArray();
     }
 
@@ -114,8 +114,12 @@ public class MainWindowViewModel : ReactiveObject
 
         using var stream =  File.Open(path, FileMode.Open);
         var nettrace = NettraceReader.Read(stream);
-        allEventBlocks = nettrace.EventBlocks.Select(b => new EventViewModel(b)).ToArray();
-        MetadataBlocks = nettrace.MetadataBlocks.SelectMany(s => s.EventBlobs)
+        allEventBlocks = nettrace.EventBlocks
+            .SelectMany(eb => eb.EventBlobs)
+            .Select(b => new EventViewModel(b))
+            .ToArray();
+        MetadataBlocks = nettrace.MetadataBlocks
+            .SelectMany(s => s.EventBlobs)
             .Select(s => new MetadataBlobViewModel(s))
             .ToArray();
         Status = $"Read {stream.Position} bytes";
