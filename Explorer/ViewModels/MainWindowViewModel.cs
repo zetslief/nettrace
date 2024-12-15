@@ -15,6 +15,8 @@ public class MetadataViewModel(MetadataBlock metadataBlock)
 {
     private readonly MetadataBlock metadataBlock = metadataBlock;
 
+    public MetadataBlock Block => metadataBlock;
+
     public override string ToString()
     {
         return metadataBlock.ToString();
@@ -24,6 +26,8 @@ public class MetadataViewModel(MetadataBlock metadataBlock)
 public class EventViewModel(EventBlock metadataBlock)
 {
     private readonly EventBlock eventBlock = metadataBlock;
+
+    public EventBlock Block => eventBlock;
 
     public override string ToString()
     {
@@ -39,11 +43,31 @@ public class MainWindowViewModel : ReactiveObject
     private MetadataViewModel[]? metadataBlocks = null;
     private MetadataViewModel? selectedMetadataBlock = null; 
 
+    private IEnumerable<EventViewModel>? allEventBlocks = null;
     private IEnumerable<EventViewModel>? eventBlocks = null;
 
     public MainWindowViewModel()
     {
         WelcomeCommand = ReactiveCommand.Create(OnCommand);
+        this.WhenAnyValue(x => x.SelectedMetadataBlock)
+            .Subscribe(RefreshEventBlocks);
+    }
+
+    private void RefreshEventBlocks(MetadataViewModel? model)
+    {
+        Console.WriteLine($"Selected: {model?.Block}");
+
+        if (model is null)
+        {
+            EventBlocks = [];
+            return;
+        }
+
+        var metadataIds = model.Block.EventBlobs.Select(b => b.Payload.Header.MetaDataId).ToHashSet();
+        Console.WriteLine($"Metadata IDs: {string.Join(',', metadataIds)}");
+        EventBlocks = allEventBlocks?
+            .Where(b => b.Block.EventBlobs.Any(p => metadataIds.Contains(p.MetadataId)))
+            .ToArray();
     }
 
     public ICommand WelcomeCommand { get; }
@@ -95,8 +119,8 @@ public class MainWindowViewModel : ReactiveObject
 
         using var stream =  File.Open(path, FileMode.Open);
         var nettrace = NettraceReader.Read(stream);
+        allEventBlocks = nettrace.EventBlocks.Select(b => new EventViewModel(b)).ToArray();
         MetadataBlocks = nettrace.MetadataBlocks.Select(b => new MetadataViewModel(b)).ToArray();
-        EventBlocks = nettrace.EventBlocks.Select(b => new EventViewModel(b)).ToArray();
         Status = $"Read {stream.Position} bytes";
     }
 }

@@ -20,9 +20,11 @@
                 Watermark="Enter a file path"/>
             <Button Command="{Binding WelcomeCommand}"
                 Content="Read"/>
+            <TextBlock Text="{Binding Status}"/>
         </StackPanel>
         <ListBox ItemsSource="{Binding MetadataBlocks}"
-            SelectedItem="SelectedMetadataBlock"
+            SelectedItem="{Binding SelectedMetadataBlock}"
+            SelectionMode="Single"
             Grid.Row="1"
             Grid.Column="0">
             <ListBox.ItemTemplate>
