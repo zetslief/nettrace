@@ -2,27 +2,40 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reactive.Linq;
 using System.Windows.Input;
 using Nettrace;
 using ReactiveUI;
 
-using MetadataBlock = Nettrace.NettraceReader.EventBlob<Nettrace.NettraceReader.MetadataEvent>;
-using EventBlock = Nettrace.NettraceReader.EventBlob<Nettrace.NettraceReader.Event>;
+using static Nettrace.NettraceReader;
 
 namespace Explorer.ViewModels;
 
-public class MetadataBlobViewModel(MetadataBlock metadata)
+public class MetadataBlockViewModel(Block<MetadataEvent> metadata)
 {
-    public MetadataBlock Block { get; } = metadata;
+    private readonly Block<MetadataEvent> metadata = metadata;
 
-    public override string ToString() => Block.ToString();
+    public Header Header => metadata.Header;
+
+    public IReadOnlyCollection<MetadataEventBlobViewModel> Blobs { get; } = metadata.EventBlobs
+        .Select(b => new MetadataEventBlobViewModel(b))
+        .ToArray();
 }
 
-public class EventViewModel(EventBlock metadataBlock)
+public class MetadataEventBlobViewModel(EventBlob<MetadataEvent> blob)
 {
-    private readonly EventBlock eventBlock = metadataBlock;
+    private readonly EventBlob<MetadataEvent> blob = blob;
 
-    public EventBlock Block => eventBlock;
+    public MetadataEvent Payload => blob.Payload;
+
+    public override string ToString() => blob.ToString();
+}
+
+public class EventBlockViewModel(Block<Event> metadataBlock)
+{
+    private readonly Block<Event> eventBlock = metadataBlock;
+
+    public Block<Event> Block => eventBlock;
 
     public override string ToString()
     {
@@ -30,39 +43,41 @@ public class EventViewModel(EventBlock metadataBlock)
     }
 }
 
+public class EventBlobViewModel(EventBlob<Event> eventBlob)
+{
+    public EventBlob<Event> Blob => eventBlob;
+
+    public override string ToString() => Blob.ToString();
+}
+
 public class MainWindowViewModel : ReactiveObject
 {
     private string? filePath = "./../perf.nettrace";
     private string status = string.Empty;
 
-    private MetadataBlobViewModel[]? metadataBlocks = null;
-    private MetadataBlobViewModel? selectedMetadataBlock = null; 
+    private IEnumerable<MetadataBlockViewModel>? metadataBlocks = null;
+    private MetadataBlockViewModel? selectedMetadataBlock = null; 
 
-    private IEnumerable<EventViewModel>? allEventBlocks = null;
-    private IEnumerable<EventViewModel>? eventBlocks = null;
+    private ObservableAsPropertyHelper<IEnumerable<MetadataEventBlobViewModel>?> metadataEventBlobs;
+    private MetadataEventBlobViewModel? selectedMetadataEventBlob = null; 
+    private EventBlobViewModel[]? allEventBlobs; 
+
+    private ObservableAsPropertyHelper<IEnumerable<EventBlobViewModel>?> eventBlocks;
+    private ObservableAsPropertyHelper<DateTime[]?> timePoints;
 
     public MainWindowViewModel()
     {
         WelcomeCommand = ReactiveCommand.Create(OnCommand);
-        this.WhenAnyValue(x => x.SelectedMetadataBlock)
-            .Subscribe(RefreshEventBlocks);
-    }
 
-    private void RefreshEventBlocks(MetadataBlobViewModel? model)
-    {
-        Console.WriteLine($"Selected: {model?.Block}");
-
-        if (model is null)
-        {
-            EventBlocks = [];
-            return;
-        }
-
-        var metadataId = model.Block.Payload.Header.MetaDataId;
-        Console.WriteLine($"Metadata IDs: {string.Join(',', metadataId)}");
-        EventBlocks = allEventBlocks?
-            .Where(b => b.Block.MetadataId == metadataId)
-            .ToArray();
+        metadataEventBlobs = this.WhenAnyValue(x => x.SelectedMetadataBlock)
+            .Select(metadataBlock => metadataBlock?.Blobs)   
+            .ToProperty(this, vm => vm.MetadataEventBlobs);
+        eventBlocks = this.WhenAnyValue(x => x.SelectedMetadataEventBlob)
+            .Select(blob => allEventBlobs?.Where(eb => eb.Blob.MetadataId == blob?.Payload.Header.MetaDataId).ToArray())
+            .ToProperty(this, vm => vm.EventBlocks); 
+        timePoints = this.WhenAnyValue(x => x.EventBlocks)
+            .Select(blocks => blocks?.Select(block => DateTime.FromFileTime(block.Blob.TimeStamp)).ToArray())
+            .ToProperty(this, vm => vm.TimePoints);
     }
 
     public ICommand WelcomeCommand { get; }
@@ -73,23 +88,29 @@ public class MainWindowViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref filePath, value);
     }
 
-    public MetadataBlobViewModel[]? MetadataBlocks
+    public IEnumerable<MetadataBlockViewModel>? MetadataBlocks
     {
         get => metadataBlocks;
         private set => this.RaiseAndSetIfChanged(ref metadataBlocks, value);
     }
 
-    public MetadataBlobViewModel? SelectedMetadataBlock
+    public MetadataBlockViewModel? SelectedMetadataBlock
     {
         get => selectedMetadataBlock;
         set => this.RaiseAndSetIfChanged(ref selectedMetadataBlock, value);
     }
 
-    public IEnumerable<EventViewModel>? EventBlocks
+    public IEnumerable<MetadataEventBlobViewModel>? MetadataEventBlobs => metadataEventBlobs.Value;
+
+    public MetadataEventBlobViewModel? SelectedMetadataEventBlob
     {
-        get => eventBlocks;
-        set => this.RaiseAndSetIfChanged(ref eventBlocks, value);
+        get => selectedMetadataEventBlob;
+        set => this.RaiseAndSetIfChanged(ref selectedMetadataEventBlob, value);
     }
+
+    public IEnumerable<EventBlobViewModel>? EventBlocks => eventBlocks.Value;
+
+    public DateTime[]? TimePoints => timePoints.Value;
 
     public string Status
     {
@@ -114,13 +135,12 @@ public class MainWindowViewModel : ReactiveObject
 
         using var stream =  File.Open(path, FileMode.Open);
         var nettrace = NettraceReader.Read(stream);
-        allEventBlocks = nettrace.EventBlocks
-            .SelectMany(eb => eb.EventBlobs)
-            .Select(b => new EventViewModel(b))
+        allEventBlobs = nettrace.EventBlocks
+            .SelectMany(block => block.EventBlobs)
+            .Select(blob => new EventBlobViewModel(blob))
             .ToArray();
         MetadataBlocks = nettrace.MetadataBlocks
-            .SelectMany(s => s.EventBlobs)
-            .Select(s => new MetadataBlobViewModel(s))
+            .Select(block => new MetadataBlockViewModel(block))
             .ToArray();
         Status = $"Read {stream.Position} bytes";
     }

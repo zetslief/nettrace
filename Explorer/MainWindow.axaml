@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:Explorer.ViewModels;assembly=Explorer"
+        xmlns:controls="clr-namespace:Explorer.Controls;assembly=Explorer"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Explorer.MainWindow"
         x:DataType="vm:MainWindowViewModel"
@@ -11,38 +12,60 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
     <Grid
-        ColumnDefinitions="3*,7*"
-        RowDefinitions="Auto,*">
+        RowDefinitions="Auto,9*,1*">
         <StackPanel Orientation="Horizontal"
-            Grid.Row="0"
-            Grid.ColumnSpan="2">
+            Grid.Row="0">
             <TextBox Text="{Binding FilePath}"
                 Watermark="Enter a file path"/>
             <Button Command="{Binding WelcomeCommand}"
                 Content="Read"/>
             <TextBlock Text="{Binding Status}"/>
         </StackPanel>
-        <ListBox ItemsSource="{Binding MetadataBlocks}"
-            SelectedItem="{Binding SelectedMetadataBlock}"
-            SelectionMode="Single"
-            Grid.Row="1"
-            Grid.Column="0">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <TextBlock Text="{Binding}"
-                        TextWrapping="Wrap"/>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
-        <ListBox ItemsSource="{Binding EventBlocks}"
-            Grid.Row="1"
-            Grid.Column="1">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <TextBlock Text="{Binding}"
-                        TextWrapping="Wrap"/>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+        <Grid ColumnDefinitions="2*,2*,6*"
+            Grid.Row="1">
+            <ListBox ItemsSource="{Binding MetadataBlocks}"
+                SelectedItem="{Binding SelectedMetadataBlock}"
+                SelectionMode="Single"
+                Grid.Row="1"
+                Grid.Column="0">
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:MetadataBlockViewModel}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Metadata with "/>
+                            <TextBlock Text="{Binding Blobs.Count}"/>
+                            <TextBlock Text=" blobs. Timestamps:"/>
+                            <TextBlock Text="{Binding Header.MinTimestamp}"/>
+                            <TextBlock Text=" - "/>
+                            <TextBlock Text="{Binding Header.MaxTimestamp}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <ListBox ItemsSource="{Binding MetadataEventBlobs}"
+                SelectedItem="{Binding SelectedMetadataEventBlob}"
+                SelectionMode="Single"
+                Grid.Row="1"
+                Grid.Column="1">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                            TextWrapping="Wrap"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+            <ListBox ItemsSource="{Binding EventBlocks}"
+                Grid.Row="1"
+                Grid.Column="2">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                            TextWrapping="Wrap"/>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+        <Panel Grid.Row="2">
+            <controls:TimespanControl Items="{Binding TimePoints}"/>
+        </Panel>
     </Grid>
 </Window>
