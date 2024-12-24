@@ -4,10 +4,12 @@ using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Windows.Input;
+using Explorer.Controls;
 using Nettrace;
 using ReactiveUI;
 
 using static Nettrace.NettraceReader;
+using Range = Explorer.Controls.Range;
 
 namespace Explorer.ViewModels;
 
@@ -62,8 +64,8 @@ public class MainWindowViewModel : ReactiveObject
     private MetadataEventBlobViewModel? selectedMetadataEventBlob = null; 
     private EventBlobViewModel[]? allEventBlobs; 
 
-    private ObservableAsPropertyHelper<IEnumerable<EventBlobViewModel>?> eventBlocks;
-    private ObservableAsPropertyHelper<DateTime[]?> timePoints;
+    private ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> eventBlocks;
+    private ObservableAsPropertyHelper<LabeledRange[]?> timePoints;
 
     public MainWindowViewModel()
     {
@@ -76,7 +78,7 @@ public class MainWindowViewModel : ReactiveObject
             .Select(blob => allEventBlobs?.Where(eb => eb.Blob.MetadataId == blob?.Payload.Header.MetaDataId).ToArray())
             .ToProperty(this, vm => vm.EventBlocks); 
         timePoints = this.WhenAnyValue(x => x.EventBlocks)
-            .Select(blocks => blocks?.Select(block => DateTime.FromFileTime(block.Blob.TimeStamp)).ToArray())
+            .Select(blobs => blobs is null ? null : BlobsToRectangles(blobs))
             .ToProperty(this, vm => vm.TimePoints);
     }
 
@@ -108,9 +110,9 @@ public class MainWindowViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref selectedMetadataEventBlob, value);
     }
 
-    public IEnumerable<EventBlobViewModel>? EventBlocks => eventBlocks.Value;
+    public IReadOnlyCollection<EventBlobViewModel>? EventBlocks => eventBlocks.Value;
 
-    public DateTime[]? TimePoints => timePoints.Value;
+    public LabeledRange[]? TimePoints => timePoints.Value;
 
     public string Status
     {
@@ -143,5 +145,28 @@ public class MainWindowViewModel : ReactiveObject
             .Select(block => new MetadataBlockViewModel(block))
             .ToArray();
         Status = $"Read {stream.Position} bytes";
+    }
+
+    private static LabeledRange[] BlobsToRectangles(IReadOnlyCollection<EventBlobViewModel> blobs)
+    {
+        DateTime? previousTime = null;
+        double previousValue = 0;
+        var result = new LabeledRange[blobs.Count - 1];
+        int index = 0;
+        foreach (var blob in blobs.OrderBy(blob => blob.Blob.TimeStamp))
+        {
+            if (previousTime is null)
+            {
+                previousTime = DateTime.FromFileTime(blob.Blob.TimeStamp);
+            }
+            else
+            {
+                var value = (DateTime.FromFileTime(blob.Blob.TimeStamp) - previousTime.Value).TotalMilliseconds;
+                result[index] = new LabeledRange("", new(previousValue, value)); 
+                previousValue = value;
+                ++index;
+            }
+        }
+        return result;
     }
 }

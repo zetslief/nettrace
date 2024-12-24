@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Media;
@@ -9,11 +10,16 @@ using SkiaSharp;
 
 namespace Explorer.Controls;
 
-internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, DateTime[]? data) : ICustomDrawOperation
+public record Range(double From, double To);
+
+public abstract record Renderable();
+public record LabeledRange(string Label, Range Range) : Renderable();
+
+internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, Renderable[]? data) : ICustomDrawOperation
 {
     private readonly IImmutableGlyphRunReference _noSkia = noSkia.TryCreateImmutableGlyphRunReference()
             ?? throw new InvalidOperationException("Failed to create no skia.");
-    private readonly DateTime[]? data = data;
+    private readonly Renderable[]? data = data;
 
     public void Dispose()
     {
@@ -42,35 +48,57 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, DateTi
 
         canvas.Clear(SKColors.Black);
 
-        var min = data.Min();
-        var max = data.Max();
-        var range = max - min;
+        var dataBounds = Measure(data);
 
-        if (range == TimeSpan.Zero)
+        foreach (var item in data)
         {
-            return; 
-        }
-
-        var paint = new SKPaint
-        {
-            Color = SKColors.DarkGreen,
-            Style = SKPaintStyle.Fill
-        };
-        
-
-        foreach (var point in data)
-        {
-            var distance = point - min;
-            var position = distance / range;
-            var scaledPosition = position * Bounds.Width;
-            var rect = new SKRect(0, 0, (float)Bounds.Width / 2, (float)Bounds.Height / 2);
-            canvas.DrawLine(
-                new SKPoint((float)scaledPosition, 0),
-                new SKPoint((float)scaledPosition, (float)Bounds.Height),
-                paint
-            );
+            switch (item)
+            {
+                case LabeledRange lr:
+                    RenderLabeledRectangle(canvas, dataBounds, Bounds, lr);
+                    break;
+                default:
+                    throw new NotImplementedException($"Rendering for {item} is not implemented yet.");
+            }
         }
 
         canvas.Restore();
+    }
+
+    private static Rect Measure(IEnumerable<Renderable> items)
+    {
+        var result = new Rect(0, 0, 0, 0);
+        foreach (var item in items)
+        {
+            switch (item)
+            {
+                case LabeledRange range:
+                    result = result.WithX(Math.Min((float)range.Range.From, result.Left));
+                    result = result.WithWidth(Math.Max((float)range.Range.To, result.Width));
+                    break;
+                default:
+                    throw new NotImplementedException($"Measuring for {item} is not implemented yet.");
+            }
+        }
+        return result;
+    }
+
+    private static void RenderLabeledRectangle(SKCanvas canvas, Rect dataBounds, Rect bounds, LabeledRange item)
+    {
+        var paint = new SKPaint
+        {
+            Color = SKColors.DarkGoldenrod,
+            Style = SKPaintStyle.Stroke,
+        };
+
+        // 0 is top, Height is bottom + 1
+        canvas.DrawRect(
+            new(
+                (float)(item.Range.From / dataBounds.Width * bounds.Width),
+                -1,
+                (float)(item.Range.To / dataBounds.Width * bounds.Width),
+                (float)bounds.Height
+            ),
+            paint);
     }
 }
