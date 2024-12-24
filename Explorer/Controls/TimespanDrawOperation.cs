@@ -66,7 +66,7 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, DateTi
             var rect = new SKRect(0, 0, (float)Bounds.Width / 2, (float)Bounds.Height / 2);
             canvas.DrawLine(
                 new SKPoint((float)scaledPosition, 0),
-                new SKPoint((float)scaledPosition, 1),
+                new SKPoint((float)scaledPosition, (float)Bounds.Height),
                 paint
             );
         }
