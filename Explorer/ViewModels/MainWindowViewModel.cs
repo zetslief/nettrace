@@ -60,17 +60,20 @@ public class MainWindowViewModel : ReactiveObject
     private IEnumerable<MetadataBlockViewModel>? metadataBlocks = null;
     private MetadataBlockViewModel? selectedMetadataBlock = null; 
 
-    private ObservableAsPropertyHelper<IEnumerable<MetadataEventBlobViewModel>?> metadataEventBlobs;
+    private readonly ObservableAsPropertyHelper<IEnumerable<MetadataEventBlobViewModel>?> metadataEventBlobs;
     private MetadataEventBlobViewModel? selectedMetadataEventBlob = null; 
     private EventBlobViewModel[]? allEventBlobs; 
 
-    private ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> eventBlocks;
-    private ObservableAsPropertyHelper<LabeledRange[]?> timePoints;
+    private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> eventBlocks;
+    private readonly ObservableAsPropertyHelper<LabeledRange[]?> timePoints;
 
     public MainWindowViewModel()
     {
         WelcomeCommand = ReactiveCommand.Create(OnCommand);
 
+        this.WhenAnyValue(v => v.MetadataBlocks)
+            .Select(m => (MetadataBlockViewModel?)null)
+            .ToProperty(this, vm => vm.SelectedMetadataBlock);
         metadataEventBlobs = this.WhenAnyValue(x => x.SelectedMetadataBlock)
             .Select(metadataBlock => metadataBlock?.Blobs)   
             .ToProperty(this, vm => vm.MetadataEventBlobs);
@@ -149,6 +152,8 @@ public class MainWindowViewModel : ReactiveObject
 
     private static LabeledRange[] BlobsToRectangles(IReadOnlyCollection<EventBlobViewModel> blobs)
     {
+        if (blobs.Count == 0) return [];
+
         DateTime? previousTime = null;
         double previousValue = 0;
         var result = new LabeledRange[blobs.Count - 1];
