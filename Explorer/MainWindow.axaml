@@ -53,7 +53,7 @@
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
-            <ListBox ItemsSource="{Binding EventBlocks}"
+            <ListBox ItemsSource="{Binding EventBlobs}"
                 Grid.Row="1"
                 Grid.Column="2">
                 <ListBox.ItemTemplate>

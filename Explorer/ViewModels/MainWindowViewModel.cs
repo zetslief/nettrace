@@ -57,14 +57,14 @@ public class MainWindowViewModel : ReactiveObject
     private string? filePath = "./../perf.nettrace";
     private string status = string.Empty;
 
-    private IEnumerable<MetadataBlockViewModel>? metadataBlocks = null;
+    private IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks = null;
     private MetadataBlockViewModel? selectedMetadataBlock = null; 
 
     private readonly ObservableAsPropertyHelper<IEnumerable<MetadataEventBlobViewModel>?> metadataEventBlobs;
     private MetadataEventBlobViewModel? selectedMetadataEventBlob = null; 
     private EventBlobViewModel[]? allEventBlobs; 
 
-    private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> eventBlocks;
+    private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> eventBlobs;
     private readonly ObservableAsPropertyHelper<LabeledRange[]?> timePoints;
 
     public MainWindowViewModel()
@@ -77,11 +77,10 @@ public class MainWindowViewModel : ReactiveObject
         metadataEventBlobs = this.WhenAnyValue(x => x.SelectedMetadataBlock)
             .Select(metadataBlock => metadataBlock?.Blobs)   
             .ToProperty(this, vm => vm.MetadataEventBlobs);
-        eventBlocks = this.WhenAnyValue(x => x.SelectedMetadataEventBlob)
+        eventBlobs = this.WhenAnyValue(x => x.SelectedMetadataEventBlob)
             .Select(blob => allEventBlobs?.Where(eb => eb.Blob.MetadataId == blob?.Payload.Header.MetaDataId).ToArray())
-            .ToProperty(this, vm => vm.EventBlocks); 
-        timePoints = this.WhenAnyValue(x => x.EventBlocks)
-            .Select(blobs => blobs is null ? null : BlobsToRectangles(blobs))
+            .ToProperty(this, vm => vm.EventBlobs); 
+        timePoints = this.WhenAnyValue(v => v.MetadataBlocks, v => v.EventBlobs, ToLabeledRanges)
             .ToProperty(this, vm => vm.TimePoints);
     }
 
@@ -93,7 +92,7 @@ public class MainWindowViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref filePath, value);
     }
 
-    public IEnumerable<MetadataBlockViewModel>? MetadataBlocks
+    public IReadOnlyCollection<MetadataBlockViewModel>? MetadataBlocks
     {
         get => metadataBlocks;
         private set => this.RaiseAndSetIfChanged(ref metadataBlocks, value);
@@ -113,7 +112,7 @@ public class MainWindowViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref selectedMetadataEventBlob, value);
     }
 
-    public IReadOnlyCollection<EventBlobViewModel>? EventBlocks => eventBlocks.Value;
+    public IReadOnlyCollection<EventBlobViewModel>? EventBlobs => eventBlobs.Value;
 
     public LabeledRange[]? TimePoints => timePoints.Value;
 
@@ -150,13 +149,21 @@ public class MainWindowViewModel : ReactiveObject
         Status = $"Read {stream.Position} bytes";
     }
 
-    private static LabeledRange[] BlobsToRectangles(IReadOnlyCollection<EventBlobViewModel> blobs)
+    private static LabeledRange[]? ToLabeledRanges(IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks, IReadOnlyCollection<EventBlobViewModel>? eventBlobs)
     {
-        if (blobs.Count == 0) return [];
+        if (eventBlobs?.Count > 1)
+        {
+            var result = new LabeledRange[eventBlobs.Count - 1];
+            BlobsToRanges(eventBlobs, result.AsSpan());
+            return result;
+        }
+        return null;
+    }
 
+    private static void BlobsToRanges(IReadOnlyCollection<EventBlobViewModel> blobs, Span<LabeledRange> output)
+    {
         DateTime? previousTime = null;
         double previousValue = 0;
-        var result = new LabeledRange[blobs.Count - 1];
         int index = 0;
         foreach (var blob in blobs.OrderBy(blob => blob.Blob.TimeStamp))
         {
@@ -167,11 +174,10 @@ public class MainWindowViewModel : ReactiveObject
             else
             {
                 var value = (DateTime.FromFileTime(blob.Blob.TimeStamp) - previousTime.Value).TotalMilliseconds;
-                result[index] = new LabeledRange("", new(previousValue, value)); 
+                output[index] = new LabeledRange("", new(previousValue, value)); 
                 previousValue = value;
                 ++index;
             }
         }
-        return result;
     }
 }

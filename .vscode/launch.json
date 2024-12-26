@@ -9,8 +9,8 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/Playground/bin/Debug/net8.0/Playground.dll",
-            "args": ["perf.nettrace"],
+            "program": "${workspaceFolder}/Explorer/bin/Debug/net8.0/Explorer.dll",
+            "args": [],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
             "console": "internalConsole"
