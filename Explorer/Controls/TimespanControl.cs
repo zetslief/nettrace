@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
@@ -11,15 +12,15 @@ namespace Explorer.Controls;
 public sealed class TimespanControl : Control
 {
     private readonly GlyphRun _noSkia;
-    private Renderable[]? items;
+    private IReadOnlyCollection<Renderable>? items;
 
-    public static readonly DirectProperty<TimespanControl, Renderable[]?> ItemsProperty = AvaloniaProperty.RegisterDirect<TimespanControl, Renderable[]?>(
+    public static readonly DirectProperty<TimespanControl, IReadOnlyCollection<Renderable>?> ItemsProperty = AvaloniaProperty.RegisterDirect<TimespanControl, IReadOnlyCollection<Renderable>?>(
         "Items",
         owner => owner.items,
         (owner, value) => owner.items = value,
         defaultBindingMode: BindingMode.TwoWay);
 
-    public Renderable[]? Items
+    public IReadOnlyCollection<Renderable>? Items
     {
         get => GetValue(ItemsProperty);
         set => SetValue(ItemsProperty, value);

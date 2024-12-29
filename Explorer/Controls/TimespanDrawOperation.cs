@@ -15,11 +15,11 @@ public record Range(double From, double To);
 public abstract record Renderable();
 public record LabeledRange(string Label, Range Range) : Renderable();
 
-internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, Renderable[]? data) : ICustomDrawOperation
+internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadOnlyCollection<Renderable>? data) : ICustomDrawOperation
 {
     private readonly IImmutableGlyphRunReference _noSkia = noSkia.TryCreateImmutableGlyphRunReference()
             ?? throw new InvalidOperationException("Failed to create no skia.");
-    private readonly Renderable[]? data = data;
+    private readonly IReadOnlyCollection<Renderable>? data = data;
 
     public void Dispose()
     {
@@ -40,7 +40,7 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, Render
             return;
         }
 
-        if (data is null || data.Length == 0)
+        if (data is null || data.Count == 0)
             return;
 
         using var lease = leaseFeature.Lease();

@@ -65,7 +65,7 @@ public class MainWindowViewModel : ReactiveObject
     private EventBlobViewModel[]? allEventBlobs; 
 
     private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> eventBlobs;
-    private readonly ObservableAsPropertyHelper<LabeledRange[]?> timePoints;
+    private readonly ObservableAsPropertyHelper<IReadOnlyCollection<Renderable>> timePoints;
 
     public MainWindowViewModel()
     {
@@ -114,7 +114,7 @@ public class MainWindowViewModel : ReactiveObject
 
     public IReadOnlyCollection<EventBlobViewModel>? EventBlobs => eventBlobs.Value;
 
-    public LabeledRange[]? TimePoints => timePoints.Value;
+    public IReadOnlyCollection<Renderable> TimePoints => timePoints.Value;
 
     public string Status
     {
@@ -149,18 +149,17 @@ public class MainWindowViewModel : ReactiveObject
         Status = $"Read {stream.Position} bytes";
     }
 
-    private static LabeledRange[]? ToLabeledRanges(IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks, IReadOnlyCollection<EventBlobViewModel>? eventBlobs)
+    private static IReadOnlyCollection<Renderable> ToLabeledRanges(IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks, IReadOnlyCollection<EventBlobViewModel>? eventBlobs)
     {
+        var result = new List<Renderable>(100);
         if (eventBlobs?.Count > 1)
         {
-            var result = new LabeledRange[eventBlobs.Count - 1];
-            BlobsToRanges(eventBlobs, result.AsSpan());
-            return result;
+            BlobsToRanges(eventBlobs, result);
         }
-        return null;
+        return result;
     }
 
-    private static void BlobsToRanges(IReadOnlyCollection<EventBlobViewModel> blobs, Span<LabeledRange> output)
+    private static void BlobsToRanges(IReadOnlyCollection<EventBlobViewModel> blobs, List<Renderable> output)
     {
         DateTime? previousTime = null;
         double previousValue = 0;
@@ -174,7 +173,7 @@ public class MainWindowViewModel : ReactiveObject
             else
             {
                 var value = (DateTime.FromFileTime(blob.Blob.TimeStamp) - previousTime.Value).TotalMilliseconds;
-                output[index] = new LabeledRange("", new(previousValue, value)); 
+                output.Add(new LabeledRange("", new(previousValue, value))); 
                 previousValue = value;
                 ++index;
             }
