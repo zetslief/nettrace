@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Platform;
@@ -10,7 +9,7 @@ using SkiaSharp;
 
 namespace Explorer.Controls;
 
-public record Range(double From, double To);
+public record Range(DateTime From, DateTime To);
 
 public abstract record Renderable();
 public record LabeledRange(string Label, Range Range) : Renderable();
@@ -65,16 +64,18 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
         canvas.Restore();
     }
 
-    private static Rect Measure(IEnumerable<Renderable> items)
+    private static Range Measure(IEnumerable<Renderable> items)
     {
-        var result = new Rect(0, 0, 0, 0);
+        var result = new Range(DateTime.MaxValue, DateTime.MinValue);
         foreach (var item in items)
         {
             switch (item)
             {
                 case LabeledRange range:
-                    result = result.WithX(Math.Min((float)range.Range.From, result.Left));
-                    result = result.WithWidth(Math.Max((float)range.Range.To, result.Width));
+                    result = result with {
+                        From = range.Range.From < result.From ? range.Range.From : result.From,
+                        To = range.Range.To > result.To ? range.Range.To : result.To 
+                    };
                     break;
                 default:
                     throw new NotImplementedException($"Measuring for {item} is not implemented yet.");
@@ -83,7 +84,7 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
         return result;
     }
 
-    private static void RenderLabeledRectangle(SKCanvas canvas, Rect dataBounds, Rect bounds, LabeledRange item)
+    private static void RenderLabeledRectangle(SKCanvas canvas, Range dataBounds, Rect bounds, LabeledRange item)
     {
         var paint = new SKPaint
         {
@@ -91,12 +92,16 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
             Style = SKPaintStyle.Stroke,
         };
 
+        var width = dataBounds.To - dataBounds.From;
+        var fromX = (item.Range.From - dataBounds.From) / width;
+        var toX = (item.Range.To - dataBounds.From) / width;
+
         // 0 is top, Height is bottom + 1
         canvas.DrawRect(
             new(
-                (float)(item.Range.From / dataBounds.Width * bounds.Width),
+                (float)(fromX * bounds.Width),
                 -1,
-                (float)(item.Range.To / dataBounds.Width * bounds.Width),
+                (float)(toX * bounds.Width),
                 (float)bounds.Height
             ),
             paint);

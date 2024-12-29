@@ -152,18 +152,26 @@ public class MainWindowViewModel : ReactiveObject
     private static IReadOnlyCollection<Renderable> ToLabeledRanges(IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks, IReadOnlyCollection<EventBlobViewModel>? eventBlobs)
     {
         var result = new List<Renderable>(100);
+
+        if (metadataBlocks?.Count > 1)
+            MetadataBlocksToRanges(metadataBlocks, result);
+
         if (eventBlobs?.Count > 1)
-        {
             BlobsToRanges(eventBlobs, result);
-        }
         return result;
+    }
+
+    private static void MetadataBlocksToRanges(IReadOnlyCollection<MetadataBlockViewModel> metadataBlocks, List<Renderable> result)
+    {
+        foreach (var block in metadataBlocks.OrderBy(block => block.Header.MinTimestamp))
+            result.Add(new LabeledRange("", new(
+                DateTime.FromFileTime(block.Header.MinTimestamp),
+                DateTime.FromFileTime(block.Header.MaxTimestamp))));
     }
 
     private static void BlobsToRanges(IReadOnlyCollection<EventBlobViewModel> blobs, List<Renderable> output)
     {
         DateTime? previousTime = null;
-        double previousValue = 0;
-        int index = 0;
         foreach (var blob in blobs.OrderBy(blob => blob.Blob.TimeStamp))
         {
             if (previousTime is null)
@@ -172,10 +180,7 @@ public class MainWindowViewModel : ReactiveObject
             }
             else
             {
-                var value = (DateTime.FromFileTime(blob.Blob.TimeStamp) - previousTime.Value).TotalMilliseconds;
-                output.Add(new LabeledRange("", new(previousValue, value))); 
-                previousValue = value;
-                ++index;
+                output.Add(new LabeledRange("", new(previousTime.Value, DateTime.FromFileTime(blob.Blob.TimeStamp)))); 
             }
         }
     }
