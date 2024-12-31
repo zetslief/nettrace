@@ -30,13 +30,23 @@
                 Grid.Column="0">
                 <ListBox.ItemTemplate>
                     <DataTemplate DataType="{x:Type vm:MetadataBlockViewModel}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Metadata with "/>
-                            <TextBlock Text="{Binding Blobs.Count}"/>
-                            <TextBlock Text=" blobs. Timestamps:"/>
-                            <TextBlock Text="{Binding Header.MinTimestamp}"/>
-                            <TextBlock Text=" - "/>
-                            <TextBlock Text="{Binding Header.MaxTimestamp}"/>
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Metadata with "/>
+                                <TextBlock Text="{Binding Blobs.Count}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Min: "/>
+                                <TextBlock Text="{Binding MinTime, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Max: "/>
+                                <TextBlock Text="{Binding MaxTime, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Duration"/>
+                                <TextBlock Text="{Binding Duration}"/>
+                            </StackPanel>
                         </StackPanel>
                     </DataTemplate>
                 </ListBox.ItemTemplate>

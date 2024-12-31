@@ -9,6 +9,7 @@ using Nettrace;
 using ReactiveUI;
 
 using static Nettrace.NettraceReader;
+using static Nettrace.Helpers;
 using Range = Explorer.Controls.Range;
 
 namespace Explorer.ViewModels;
@@ -19,7 +20,9 @@ public class MetadataBlockViewModel(Trace trace, Block<MetadataEvent> metadata)
 
     public Header Header => metadata.Header;
 
-    public TimeSpan Duraction => MainWindowViewModel.ToUtc(trace, Header.MaxTimestamp) - MainWindowViewModel.ToUtc(trace, Header.MinTimestamp);
+    public DateTime MinTime => QpcToUtc(trace, Header.MinTimestamp);
+    public DateTime MaxTime => QpcToUtc(trace, Header.MaxTimestamp);
+    public TimeSpan Duration => MaxTime - MinTime;
 
     public IReadOnlyCollection<MetadataEventBlobViewModel> Blobs { get; } = metadata.EventBlobs
         .Select(b => new MetadataEventBlobViewModel(b))
@@ -62,11 +65,11 @@ public class MainWindowViewModel : ReactiveObject
     private Trace? trace;
 
     private IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks = null;
-    private MetadataBlockViewModel? selectedMetadataBlock = null; 
+    private MetadataBlockViewModel? selectedMetadataBlock = null;
 
     private readonly ObservableAsPropertyHelper<IEnumerable<MetadataEventBlobViewModel>?> metadataEventBlobs;
-    private MetadataEventBlobViewModel? selectedMetadataEventBlob = null; 
-    private EventBlobViewModel[]? allEventBlobs; 
+    private MetadataEventBlobViewModel? selectedMetadataEventBlob = null;
+    private EventBlobViewModel[]? allEventBlobs;
 
     private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> eventBlobs;
     private readonly ObservableAsPropertyHelper<IReadOnlyCollection<Renderable>> timePoints;
@@ -79,11 +82,11 @@ public class MainWindowViewModel : ReactiveObject
             .Select(m => (MetadataBlockViewModel?)null)
             .ToProperty(this, vm => vm.SelectedMetadataBlock);
         metadataEventBlobs = this.WhenAnyValue(x => x.SelectedMetadataBlock)
-            .Select(metadataBlock => metadataBlock?.Blobs)   
+            .Select(metadataBlock => metadataBlock?.Blobs)
             .ToProperty(this, vm => vm.MetadataEventBlobs);
         eventBlobs = this.WhenAnyValue(x => x.SelectedMetadataEventBlob)
             .Select(blob => allEventBlobs?.Where(eb => eb.Blob.MetadataId == blob?.Payload.Header.MetaDataId).ToArray())
-            .ToProperty(this, vm => vm.EventBlobs); 
+            .ToProperty(this, vm => vm.EventBlobs);
         timePoints = this.WhenAnyValue(v => v.MetadataBlocks, v => v.EventBlobs, ToLabeledRanges)
             .ToProperty(this, vm => vm.TimePoints);
     }
@@ -182,8 +185,8 @@ public class MainWindowViewModel : ReactiveObject
     {
         foreach (var block in metadataBlocks.OrderBy(block => block.Header.MinTimestamp))
             result.Add(new LabeledRange("", new(
-                ToUtc(trace, block.Header.MinTimestamp),
-                ToUtc(trace, block.Header.MaxTimestamp))));
+                QpcToUtc(trace, block.Header.MinTimestamp),
+                QpcToUtc(trace, block.Header.MaxTimestamp))));
     }
 
     private static void BlobsToRanges(Trace trace, IReadOnlyCollection<EventBlobViewModel> blobs, List<Renderable> output)
@@ -193,18 +196,12 @@ public class MainWindowViewModel : ReactiveObject
         {
             if (previousTime is null)
             {
-                previousTime = ToUtc(trace, blob.Blob.TimeStamp);
+                previousTime = QpcToUtc(trace, blob.Blob.TimeStamp);
             }
             else
             {
-                output.Add(new LabeledRange("", new(previousTime.Value, ToUtc(trace, blob.Blob.TimeStamp)))); 
+                output.Add(new LabeledRange("", new(previousTime.Value, QpcToUtc(trace, blob.Blob.TimeStamp)))); 
             }
         }
-    }
-
-    public static DateTime ToUtc(Trace trace, long timestamp)
-    {
-        long ticks = (long)((timestamp - trace.SynTimeQpc) * 1_0_000_000 / (double)trace.QpcFrequency);
-        return trace.DateTime.AddTicks(ticks);
     }
 }
