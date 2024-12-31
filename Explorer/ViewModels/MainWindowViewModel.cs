@@ -13,11 +13,13 @@ using Range = Explorer.Controls.Range;
 
 namespace Explorer.ViewModels;
 
-public class MetadataBlockViewModel(Block<MetadataEvent> metadata)
+public class MetadataBlockViewModel(Trace trace, Block<MetadataEvent> metadata)
 {
     private readonly Block<MetadataEvent> metadata = metadata;
 
     public Header Header => metadata.Header;
+
+    public TimeSpan Duraction => MainWindowViewModel.ToUtc(trace, Header.MaxTimestamp) - MainWindowViewModel.ToUtc(trace, Header.MinTimestamp);
 
     public IReadOnlyCollection<MetadataEventBlobViewModel> Blobs { get; } = metadata.EventBlobs
         .Select(b => new MetadataEventBlobViewModel(b))
@@ -56,6 +58,8 @@ public class MainWindowViewModel : ReactiveObject
 {
     private string? filePath = "./../perf.nettrace";
     private string status = string.Empty;
+
+    private Trace? trace;
 
     private IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks = null;
     private MetadataBlockViewModel? selectedMetadataBlock = null; 
@@ -139,49 +143,68 @@ public class MainWindowViewModel : ReactiveObject
 
         using var stream =  File.Open(path, FileMode.Open);
         var nettrace = NettraceReader.Read(stream);
+        trace = nettrace.Trace;
         allEventBlobs = nettrace.EventBlocks
             .SelectMany(block => block.EventBlobs)
             .Select(blob => new EventBlobViewModel(blob))
             .ToArray();
         MetadataBlocks = nettrace.MetadataBlocks
-            .Select(block => new MetadataBlockViewModel(block))
+            .Select(block => new MetadataBlockViewModel(trace, block))
             .ToArray();
         Status = $"Read {stream.Position} bytes";
     }
 
-    private static IReadOnlyCollection<Renderable> ToLabeledRanges(IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks, IReadOnlyCollection<EventBlobViewModel>? eventBlobs)
+    private IReadOnlyCollection<Renderable> ToLabeledRanges(IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks, IReadOnlyCollection<EventBlobViewModel>? eventBlobs)
     {
-        var result = new List<Renderable>(100);
+        var result = new Stack<IReadOnlyCollection<Renderable>>();
 
         if (metadataBlocks?.Count > 1)
-            MetadataBlocksToRanges(metadataBlocks, result);
+        {
+            var metadataBlockRenderables = new List<Renderable>();
+            MetadataBlocksToRanges(trace!, metadataBlocks, metadataBlockRenderables);
+            result.Push(metadataBlockRenderables);
+        }
 
         if (eventBlobs?.Count > 1)
-            BlobsToRanges(eventBlobs, result);
-        return result;
+        {
+            var eventBlobRenderables = new List<Renderable>();
+            BlobsToRanges(trace!, eventBlobs, eventBlobRenderables);
+            result.Push(eventBlobRenderables);
+        }
+
+        return [new StackedRenderable(result)];
     }
 
-    private static void MetadataBlocksToRanges(IReadOnlyCollection<MetadataBlockViewModel> metadataBlocks, List<Renderable> result)
+    private static void MetadataBlocksToRanges(
+        Trace trace,
+        IReadOnlyCollection<MetadataBlockViewModel> metadataBlocks,
+        List<Renderable> result)
     {
         foreach (var block in metadataBlocks.OrderBy(block => block.Header.MinTimestamp))
             result.Add(new LabeledRange("", new(
-                DateTime.FromFileTime(block.Header.MinTimestamp),
-                DateTime.FromFileTime(block.Header.MaxTimestamp))));
+                ToUtc(trace, block.Header.MinTimestamp),
+                ToUtc(trace, block.Header.MaxTimestamp))));
     }
 
-    private static void BlobsToRanges(IReadOnlyCollection<EventBlobViewModel> blobs, List<Renderable> output)
+    private static void BlobsToRanges(Trace trace, IReadOnlyCollection<EventBlobViewModel> blobs, List<Renderable> output)
     {
         DateTime? previousTime = null;
         foreach (var blob in blobs.OrderBy(blob => blob.Blob.TimeStamp))
         {
             if (previousTime is null)
             {
-                previousTime = DateTime.FromFileTime(blob.Blob.TimeStamp);
+                previousTime = ToUtc(trace, blob.Blob.TimeStamp);
             }
             else
             {
-                output.Add(new LabeledRange("", new(previousTime.Value, DateTime.FromFileTime(blob.Blob.TimeStamp)))); 
+                output.Add(new LabeledRange("", new(previousTime.Value, ToUtc(trace, blob.Blob.TimeStamp)))); 
             }
         }
+    }
+
+    public static DateTime ToUtc(Trace trace, long timestamp)
+    {
+        long ticks = (long)((timestamp - trace.SynTimeQpc) * 1_0_000_000 / (double)trace.QpcFrequency);
+        return trace.DateTime.AddTicks(ticks);
     }
 }

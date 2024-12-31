@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Media;
 using Avalonia.Platform;
@@ -13,6 +15,8 @@ public record Range(DateTime From, DateTime To);
 
 public abstract record Renderable();
 public record LabeledRange(string Label, Range Range) : Renderable();
+public record StackedRenderable(Stack<IReadOnlyCollection<Renderable>> Items) : Renderable();
+
 
 internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadOnlyCollection<Renderable>? data) : ICustomDrawOperation
 {
@@ -51,44 +55,54 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
 
         foreach (var item in data)
         {
-            switch (item)
-            {
-                case LabeledRange lr:
-                    RenderLabeledRectangle(canvas, dataBounds, Bounds, lr);
-                    break;
-                default:
-                    throw new NotImplementedException($"Rendering for {item} is not implemented yet.");
-            }
+            Render(canvas, dataBounds, Bounds, item, 0);
         }
 
         canvas.Restore();
     }
 
+    private static void Render(SKCanvas canvas, Range dataBounds, Rect bounds, Renderable item, int offset)
+    {
+        switch (item)
+        {
+            case LabeledRange lr:
+                RenderLabeledRectangle(canvas, dataBounds, bounds, offset, lr);
+                break;
+            case StackedRenderable stacked:
+                foreach (var collection in stacked.Items)
+                {
+                    var stack = offset++;
+                    foreach (var single in collection)
+                        Render(canvas, dataBounds, bounds, single, stack);
+                }
+                break;
+            default:
+                throw new NotImplementedException($"Rendering for {item} is not implemented yet.");
+        }
+    }
+
     private static Range Measure(IEnumerable<Renderable> items)
     {
+        static Range Outer(Range a, Range b) => new(a.From < b.From ? a.From : b.From, a.To > b.To ? a.To : b.To);
+
         var result = new Range(DateTime.MaxValue, DateTime.MinValue);
         foreach (var item in items)
         {
-            switch (item)
+            result = item switch
             {
-                case LabeledRange range:
-                    result = result with {
-                        From = range.Range.From < result.From ? range.Range.From : result.From,
-                        To = range.Range.To > result.To ? range.Range.To : result.To 
-                    };
-                    break;
-                default:
-                    throw new NotImplementedException($"Measuring for {item} is not implemented yet.");
-            }
+                LabeledRange range => Outer(result, range.Range),
+                StackedRenderable stacked => stacked.Items.Select(Measure).Aggregate(result, Outer),
+                _ => throw new NotImplementedException($"Measuring for {item} is not implemented yet."),
+            };
         }
         return result;
     }
 
-    private static void RenderLabeledRectangle(SKCanvas canvas, Range dataBounds, Rect bounds, LabeledRange item)
+    private static void RenderLabeledRectangle(SKCanvas canvas, Range dataBounds, Rect bounds, int offset, LabeledRange item)
     {
         var paint = new SKPaint
         {
-            Color = SKColors.DarkGoldenrod,
+            Color = offset > 0 ? SKColors.DarkGoldenrod : SKColors.Green,
             Style = SKPaintStyle.Stroke,
         };
 
@@ -100,9 +114,9 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
         canvas.DrawRect(
             new(
                 (float)(fromX * bounds.Width),
-                -1,
+                (float)(0.1 * bounds.Height * offset),
                 (float)(toX * bounds.Width),
-                (float)bounds.Height
+                (float)(0.1 * bounds.Height * offset + 0.1 * bounds.Height)
             ),
             paint);
     }
