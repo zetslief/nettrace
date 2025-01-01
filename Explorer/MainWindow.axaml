@@ -91,8 +91,11 @@
                 Grid.Column="3">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <TextBlock Text="{Binding}"
-                            TextWrapping="Wrap"/>
+                        <StackPanel>
+                            <TextBlock Text="{Binding}"
+                                       TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding Timestamp, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
+                        </StackPanel>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
