@@ -2,3 +2,4 @@
 **/obj/*
 *.nettrace
 *.etlx
+*.DotSettings.user
