@@ -171,11 +171,11 @@ public class MainWindowViewModel : ReactiveObject
     {
         var result = new Stack<IReadOnlyCollection<Renderable>>();
 
-        if (metadataBlocks?.Count > 1)
+        if (eventBlobs?.Count > 1)
         {
-            var metadataBlockRenderables = new List<Renderable>();
-            MetadataBlocksToRanges(trace!, metadataBlocks, metadataBlockRenderables);
-            result.Push(metadataBlockRenderables);
+            var eventBlobRenderables = new List<Renderable>();
+            BlobsToRanges(trace!, eventBlobs, eventBlobRenderables);
+            result.Push(eventBlobRenderables);
         }
 
         if (eventBlocks?.Count > 1)
@@ -185,11 +185,11 @@ public class MainWindowViewModel : ReactiveObject
             result.Push(eventBlockRenderables);
         }
 
-        if (eventBlobs?.Count > 1)
+        if (metadataBlocks?.Count > 1)
         {
-            var eventBlobRenderables = new List<Renderable>();
-            BlobsToRanges(trace!, eventBlobs, eventBlobRenderables);
-            result.Push(eventBlobRenderables);
+            var metadataBlockRenderables = new List<Renderable>();
+            MetadataBlocksToRanges(trace!, metadataBlocks, metadataBlockRenderables);
+            result.Push(metadataBlockRenderables);
         }
 
         return [new StackedRenderable(result)];
