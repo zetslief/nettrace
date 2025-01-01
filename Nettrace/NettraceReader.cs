@@ -190,6 +190,12 @@ public static class NettraceReader
 
     private static bool TryStartObject(Stream stream, out Type? type)
     {
+        if (stream.Position == stream.Length)
+        {
+            type = null;
+            return false;
+        }
+        
         var tag = ReadTag(stream);
         if (tag == Tag.BeginPrivateObject)
         {

@@ -49,15 +49,13 @@ public sealed class EventBlockViewModel(Trace trace, Block<Event> block)
 public class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob)
 {
     public EventBlob<Event> Blob => eventBlob;
-
     public DateTime Timestamp => QpcToUtc(trace, eventBlob.TimeStamp);
-
     public override string ToString() => Blob.ToString();
 }
 
 public class MainWindowViewModel : ReactiveObject
 {
-    private string? filePath = "./../perf.nettrace";
+    private string? filePath = "./../perf_100ms.nettrace";
     private string status = string.Empty;
 
     private Trace? trace;
