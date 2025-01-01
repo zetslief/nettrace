@@ -102,7 +102,12 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
     {
         var paint = new SKPaint
         {
-            Color = offset > 0 ? SKColors.DarkGoldenrod : SKColors.Green,
+            Color = offset switch
+            {
+                0 => SKColors.Green,
+                1 => SKColors.Blue,
+                _ => SKColors.Red
+            },
             Style = SKPaintStyle.Stroke,
         };
 
