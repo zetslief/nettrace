@@ -100,7 +100,7 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
 
     private static void RenderLabeledRectangle(SKCanvas canvas, Range dataBounds, Rect bounds, int offset, LabeledRange item)
     {
-        var splitPaint = new SKPaint
+        var circlePaint = new SKPaint
         {
             Color = offset switch
             {
@@ -109,6 +109,17 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
                 _ => SKColors.Red
             },
             Style = SKPaintStyle.Fill,
+        };
+        var strokePaint = new SKPaint
+        {
+            Color = offset switch
+            {
+                0 => SKColors.Green,
+                1 => SKColors.Blue,
+                _ => SKColors.Red
+            },
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 2,
         };
         var fillPaint = new SKPaint
         {
@@ -127,14 +138,14 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
         var fromY = 0.1 * bounds.Height * offset;
         var toY = 0.1 * bounds.Height * offset + 0.1 * bounds.Height;
 
-        canvas.DrawRect(
-            new(
-                (float)(fromX * bounds.Width),
-                (float)fromY,
-                (float)(toX * bounds.Width),
-                (float)toY
-            ),
-            fillPaint);
-        canvas.DrawCircle((float)(fromX * bounds.Width), (float)fromY, 2, splitPaint);
+        SKRect rect = new(
+            (float)(fromX * bounds.Width),
+            (float)fromY,
+            (float)(toX * bounds.Width),
+            (float)toY
+        );
+        canvas.DrawRect(rect, fillPaint);
+        canvas.DrawRect(rect, strokePaint);
+        canvas.DrawCircle((float)(fromX * bounds.Width), (float)fromY, 2, circlePaint);
     }
 }
