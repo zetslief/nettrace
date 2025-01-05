@@ -11,7 +11,7 @@ using SkiaSharp;
 
 namespace Explorer.Controls;
 
-public record Range(DateTime From, DateTime To);
+public record Range(DateTime From, DateTime To, float Height);
 
 public abstract record Node();
 public record LabeledRange(string Label, Range Range) : Node();
@@ -20,8 +20,6 @@ public record StackedNode(Stack<IReadOnlyCollection<Node>> Items) : Node();
 
 internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSkia, IReadOnlyCollection<Node>? data) : ICustomDrawOperation
 {
-    private readonly Camera2D camera = new(Position.Zero, (float)bounds.Width, (float)bounds.Height, bounds.FromAvalonia());  
-    
     private readonly IImmutableGlyphRunReference _noSkia = noSkia.TryCreateImmutableGlyphRunReference()
             ?? throw new InvalidOperationException("Failed to create no skia.");
     private readonly IReadOnlyCollection<Node>? data = data;
@@ -54,6 +52,8 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
         canvas.Clear(SKColors.Black);
 
         var dataBounds = Measure(data);
+        
+        Camera2D camera = new(Position.Zero, (float)Bounds.Width, dataBounds.Height, Bounds.Into());
 
         foreach (var item in data)
         {
@@ -85,19 +85,22 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
 
     private static Range Measure(IEnumerable<Node> items)
     {
-        static Range Outer(Range a, Range b) => new(a.From < b.From ? a.From : b.From, a.To > b.To ? a.To : b.To);
+        static Range Outer(Range a, Range b) => new(
+            a.From < b.From ? a.From : b.From,
+            a.To > b.To ? a.To : b.To,
+            a.Height > b.Height ? a.Height : b.Height);
+        
+        static Range OuterWithHeightSum(Range a, Range b) =>
+            Outer(a, b) with { Height = a.Height + b.Height };
 
-        var result = new Range(DateTime.MaxValue, DateTime.MinValue);
-        foreach (var item in items)
-        {
-            result = item switch
+        return items.Aggregate(
+            new Range(DateTime.MaxValue, DateTime.MinValue, 0),
+            (result, item) => item switch
             {
                 LabeledRange range => Outer(result, range.Range),
-                StackedNode stacked => stacked.Items.Select(Measure).Aggregate(result, Outer),
+                StackedNode stacked => stacked.Items.Select(Measure).Aggregate(result, OuterWithHeightSum),
                 _ => throw new NotImplementedException($"Measuring for {item} is not implemented yet."),
-            };
-        }
-        return result;
+            });
     }
 
     private static void RenderLabeledRectangle(Camera2D camera, SKCanvas canvas, Range dataBounds, int offset, LabeledRange item)
@@ -137,14 +140,14 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
         var width = dataBounds.To - dataBounds.From;
         var fromX = (item.Range.From - dataBounds.From) / width;
         var toX = (item.Range.To - dataBounds.From) / width;
-        var fromY = 0.2 * camera.Height * offset;
-        var toY = 0.2 * camera.Height * offset + 0.2 * camera.Height;
+        var fromY = camera.ToViewY(offset);
+        var toY = camera.ToViewY(offset + item.Range.Height);
 
         SKRect rect = new(
             (float)(fromX * camera.Width),
-            (float)fromY,
+            fromY,
             (float)(toX * camera.Width),
-            (float)toY
+            toY
         );
         canvas.DrawRect(rect, fillPaint);
         canvas.DrawRect(rect, strokePaint);
@@ -162,6 +165,9 @@ public sealed class Camera2D(Position position, float width, float height, Rect 
     
     public Position ToViewPosition(Position position)
         => new(view.Width / Width * position.X, view.Height / Height * position.Y);
+    
+    public float ToViewY(float y)
+        => view.Height / Height * y;
 }
 
 public readonly record struct Position(float X, float Y)
@@ -169,16 +175,16 @@ public readonly record struct Position(float X, float Y)
     public static Position Zero { get; } = new(0, 0);
 }
 
-public readonly record struct Rect(Position TopLeft, Position BottomRight)
+public readonly record struct Rect(float Left, float Top, float Right, float Bottom)
 {
-    public float Width { get; } = BottomRight.X - TopLeft.X;
-    public float Height { get; } = BottomRight.Y - TopLeft.Y;
+    public float Width { get; } = Right - Left;
+    public float Height { get; } = Bottom - Top;
 }
 
 public static class Converters
 {
-    public static Rect FromAvalonia(this Avalonia.Rect rect)
-        => new(new((float)rect.Left, (float)rect.Top), new((float)rect.Right, (float)rect.Bottom)); 
+    public static Rect Into(this Avalonia.Rect rect)
+        => new((float)rect.Left, (float)rect.Top, (float)rect.Right, (float)rect.Bottom);
     
     public static Position FromSkia(this SKPoint point)
         => new(point.X, point.Y);

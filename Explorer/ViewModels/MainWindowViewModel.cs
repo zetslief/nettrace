@@ -200,7 +200,7 @@ public class MainWindowViewModel : ReactiveObject
     {
         result.AddRange(metadataBlocks
             .OrderBy(block => block.Header.MinTime)
-            .Select(block => new LabeledRange("Metadata Block", new(block.Header.MinTime, block.Header.MaxTime))));
+            .Select(block => new LabeledRange("Metadata Block", new(block.Header.MinTime, block.Header.MaxTime, 1))));
     }
 
     private static void EventBlocksToRanges(
@@ -210,7 +210,7 @@ public class MainWindowViewModel : ReactiveObject
     {
         result.AddRange(metadataBlocks
             .OrderBy(block => block.Header.MinTime)
-            .Select(block => new LabeledRange("Event Block", new(block.Header.MinTime, block.Header.MaxTime))));
+            .Select(block => new LabeledRange("Event Block", new(block.Header.MinTime, block.Header.MaxTime, 1))));
     }
 
     private static void BlobsToRanges(Trace trace, IReadOnlyCollection<EventBlobViewModel> blobs, List<Node> output)
@@ -224,7 +224,7 @@ public class MainWindowViewModel : ReactiveObject
             }
             else
             {
-                output.Add(new LabeledRange("", new(previousTime.Value, QpcToUtc(trace, blob.Blob.TimeStamp)))); 
+                output.Add(new LabeledRange("", new(previousTime.Value, QpcToUtc(trace, blob.Blob.TimeStamp), 1))); 
             }
         }
     }
