@@ -18,8 +18,10 @@ public record LabeledRange(string Label, Range Range) : Renderable();
 public record StackedRenderable(Stack<IReadOnlyCollection<Renderable>> Items) : Renderable();
 
 
-internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadOnlyCollection<Renderable>? data) : ICustomDrawOperation
+internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSkia, IReadOnlyCollection<Renderable>? data) : ICustomDrawOperation
 {
+    private readonly Camera2D camera = new(Position.Zero, (float)bounds.Width, (float)bounds.Height, bounds.FromAvalonia());  
+    
     private readonly IImmutableGlyphRunReference _noSkia = noSkia.TryCreateImmutableGlyphRunReference()
             ?? throw new InvalidOperationException("Failed to create no skia.");
     private readonly IReadOnlyCollection<Renderable>? data = data;
@@ -28,7 +30,7 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
     {
     }
 
-    public Rect Bounds { get; } = bounds;
+    public Avalonia.Rect Bounds { get; } = bounds;
 
     public bool HitTest(Point p) => false;
 
@@ -55,25 +57,25 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
 
         foreach (var item in data)
         {
-            Render(canvas, dataBounds, Bounds, item, 0);
+            Render(camera, canvas, dataBounds, item, 0);
         }
 
         canvas.Restore();
     }
 
-    private static void Render(SKCanvas canvas, Range dataBounds, Rect bounds, Renderable item, int offset)
+    private static void Render(Camera2D camera, SKCanvas canvas, Range dataBounds, Renderable item, int offset)
     {
         switch (item)
         {
             case LabeledRange lr:
-                RenderLabeledRectangle(canvas, dataBounds, bounds, offset, lr);
+                RenderLabeledRectangle(camera, canvas, dataBounds, offset, lr);
                 break;
             case StackedRenderable stacked:
                 foreach (var collection in stacked.Items)
                 {
                     var stack = offset++;
                     foreach (var single in collection)
-                        Render(canvas, dataBounds, bounds, single, stack);
+                        Render(camera, canvas, dataBounds, single, stack);
                 }
                 break;
             default:
@@ -98,7 +100,7 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
         return result;
     }
 
-    private static void RenderLabeledRectangle(SKCanvas canvas, Range dataBounds, Rect bounds, int offset, LabeledRange item)
+    private static void RenderLabeledRectangle(Camera2D camera, SKCanvas canvas, Range dataBounds, int offset, LabeledRange item)
     {
         var circlePaint = new SKPaint
         {
@@ -135,17 +137,49 @@ internal sealed class TimespanDrawOperation(Rect bounds, GlyphRun noSkia, IReadO
         var width = dataBounds.To - dataBounds.From;
         var fromX = (item.Range.From - dataBounds.From) / width;
         var toX = (item.Range.To - dataBounds.From) / width;
-        var fromY = 0.1 * bounds.Height * offset;
-        var toY = 0.1 * bounds.Height * offset + 0.1 * bounds.Height;
+        var fromY = 0.2 * camera.Height * offset;
+        var toY = 0.2 * camera.Height * offset + 0.2 * camera.Height;
 
         SKRect rect = new(
-            (float)(fromX * bounds.Width),
+            (float)(fromX * camera.Width),
             (float)fromY,
-            (float)(toX * bounds.Width),
+            (float)(toX * camera.Width),
             (float)toY
         );
         canvas.DrawRect(rect, fillPaint);
         canvas.DrawRect(rect, strokePaint);
-        canvas.DrawCircle((float)(fromX * bounds.Width), (float)fromY, 2, circlePaint);
+        canvas.DrawCircle((float)(fromX * camera.Width), (float)fromY, 2, circlePaint);
     }
+}
+
+public sealed class Camera2D(Position position, float width, float height, Rect view)
+{
+    private readonly Rect view = view;
+    
+    public Position Position { get; } = position;
+    public float Width { get; } = width;
+    public float Height { get; } = height;
+    
+    public Position ToViewPosition(Position position)
+        => new(view.Width / Width * position.X, view.Height / Height * position.Y);
+}
+
+public readonly record struct Position(float X, float Y)
+{
+    public static Position Zero { get; } = new(0, 0);
+}
+
+public readonly record struct Rect(Position TopLeft, Position BottomRight)
+{
+    public float Width { get; } = BottomRight.X - TopLeft.X;
+    public float Height { get; } = BottomRight.Y - TopLeft.Y;
+}
+
+public static class Converters
+{
+    public static Rect FromAvalonia(this Avalonia.Rect rect)
+        => new(new((float)rect.Left, (float)rect.Top), new((float)rect.Right, (float)rect.Bottom)); 
+    
+    public static Position FromSkia(this SKPoint point)
+        => new(point.X, point.Y);
 }

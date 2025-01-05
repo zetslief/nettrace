@@ -36,7 +36,7 @@ public sealed class TimespanControl : Control
 
     public override void Render(DrawingContext context)
     {
-        context.Custom(new TimespanDrawOperation(new Rect(0, 0, Bounds.Width, Bounds.Height), _noSkia, items));
+        context.Custom(new TimespanDrawOperation(new Avalonia.Rect(0, 0, Bounds.Width, Bounds.Height), _noSkia, items));
         Dispatcher.UIThread.InvokeAsync(InvalidateVisual, DispatcherPriority.Background);
     }
 }

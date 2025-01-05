@@ -176,14 +176,14 @@ public class MainWindowViewModel : ReactiveObject
             result.Push(eventBlobRenderables);
         }
 
-        if (eventBlocks?.Count > 1)
+        if (eventBlocks?.Count > 0)
         {
             var eventBlockRenderables = new List<Renderable>();
             EventBlocksToRanges(trace!, eventBlocks, eventBlockRenderables);
             result.Push(eventBlockRenderables);
         }
 
-        if (metadataBlocks?.Count > 1)
+        if (metadataBlocks?.Count > 0)
         {
             var metadataBlockRenderables = new List<Renderable>();
             MetadataBlocksToRanges(trace!, metadataBlocks, metadataBlockRenderables);
