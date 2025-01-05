@@ -70,7 +70,7 @@ public class MainWindowViewModel : ReactiveObject
     private EventBlobViewModel[]? allEventBlobs;
 
     private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> eventBlobs;
-    private readonly ObservableAsPropertyHelper<IReadOnlyCollection<Renderable>> timePoints;
+    private readonly ObservableAsPropertyHelper<IReadOnlyCollection<Node>> timePoints;
 
     public MainWindowViewModel()
     {
@@ -125,7 +125,7 @@ public class MainWindowViewModel : ReactiveObject
 
     public IReadOnlyCollection<EventBlobViewModel>? EventBlobs => eventBlobs.Value;
 
-    public IReadOnlyCollection<Renderable> TimePoints => timePoints.Value;
+    public IReadOnlyCollection<Node> TimePoints => timePoints.Value;
 
     public string Status
     {
@@ -162,41 +162,41 @@ public class MainWindowViewModel : ReactiveObject
         Status = $"Read {stream.Position} bytes";
     }
 
-    private IReadOnlyCollection<Renderable> ToLabeledRanges(
+    private IReadOnlyCollection<Node> ToLabeledRanges(
         IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks,
         IReadOnlyCollection<EventBlockViewModel>? eventBlocks,
         IReadOnlyCollection<EventBlobViewModel>? eventBlobs)
     {
-        var result = new Stack<IReadOnlyCollection<Renderable>>();
+        var result = new Stack<IReadOnlyCollection<Node>>();
 
         if (eventBlobs?.Count > 1)
         {
-            var eventBlobRenderables = new List<Renderable>();
+            var eventBlobRenderables = new List<Node>();
             BlobsToRanges(trace!, eventBlobs, eventBlobRenderables);
             result.Push(eventBlobRenderables);
         }
 
         if (eventBlocks?.Count > 0)
         {
-            var eventBlockRenderables = new List<Renderable>();
+            var eventBlockRenderables = new List<Node>();
             EventBlocksToRanges(trace!, eventBlocks, eventBlockRenderables);
             result.Push(eventBlockRenderables);
         }
 
         if (metadataBlocks?.Count > 0)
         {
-            var metadataBlockRenderables = new List<Renderable>();
+            var metadataBlockRenderables = new List<Node>();
             MetadataBlocksToRanges(trace!, metadataBlocks, metadataBlockRenderables);
             result.Push(metadataBlockRenderables);
         }
 
-        return [new StackedRenderable(result)];
+        return [new StackedNode(result)];
     }
 
     private static void MetadataBlocksToRanges(
         Trace trace,
         IReadOnlyCollection<MetadataBlockViewModel> metadataBlocks,
-        List<Renderable> result)
+        List<Node> result)
     {
         result.AddRange(metadataBlocks
             .OrderBy(block => block.Header.MinTime)
@@ -206,14 +206,14 @@ public class MainWindowViewModel : ReactiveObject
     private static void EventBlocksToRanges(
         Trace trace,
         IReadOnlyCollection<EventBlockViewModel> metadataBlocks,
-        List<Renderable> result)
+        List<Node> result)
     {
         result.AddRange(metadataBlocks
             .OrderBy(block => block.Header.MinTime)
             .Select(block => new LabeledRange("Event Block", new(block.Header.MinTime, block.Header.MaxTime))));
     }
 
-    private static void BlobsToRanges(Trace trace, IReadOnlyCollection<EventBlobViewModel> blobs, List<Renderable> output)
+    private static void BlobsToRanges(Trace trace, IReadOnlyCollection<EventBlobViewModel> blobs, List<Node> output)
     {
         DateTime? previousTime = null;
         foreach (var blob in blobs.OrderBy(blob => blob.Blob.TimeStamp))

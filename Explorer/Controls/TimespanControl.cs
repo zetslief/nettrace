@@ -12,15 +12,15 @@ namespace Explorer.Controls;
 public sealed class TimespanControl : Control
 {
     private readonly GlyphRun _noSkia;
-    private IReadOnlyCollection<Renderable>? items;
+    private IReadOnlyCollection<Node>? items;
 
-    public static readonly DirectProperty<TimespanControl, IReadOnlyCollection<Renderable>?> ItemsProperty = AvaloniaProperty.RegisterDirect<TimespanControl, IReadOnlyCollection<Renderable>?>(
+    public static readonly DirectProperty<TimespanControl, IReadOnlyCollection<Node>?> ItemsProperty = AvaloniaProperty.RegisterDirect<TimespanControl, IReadOnlyCollection<Node>?>(
         "Items",
         owner => owner.items,
         (owner, value) => owner.items = value,
         defaultBindingMode: BindingMode.TwoWay);
 
-    public IReadOnlyCollection<Renderable>? Items
+    public IReadOnlyCollection<Node>? Items
     {
         get => GetValue(ItemsProperty);
         set => SetValue(ItemsProperty, value);

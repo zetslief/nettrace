@@ -13,18 +13,18 @@ namespace Explorer.Controls;
 
 public record Range(DateTime From, DateTime To);
 
-public abstract record Renderable();
-public record LabeledRange(string Label, Range Range) : Renderable();
-public record StackedRenderable(Stack<IReadOnlyCollection<Renderable>> Items) : Renderable();
+public abstract record Node();
+public record LabeledRange(string Label, Range Range) : Node();
+public record StackedNode(Stack<IReadOnlyCollection<Node>> Items) : Node();
 
 
-internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSkia, IReadOnlyCollection<Renderable>? data) : ICustomDrawOperation
+internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSkia, IReadOnlyCollection<Node>? data) : ICustomDrawOperation
 {
     private readonly Camera2D camera = new(Position.Zero, (float)bounds.Width, (float)bounds.Height, bounds.FromAvalonia());  
     
     private readonly IImmutableGlyphRunReference _noSkia = noSkia.TryCreateImmutableGlyphRunReference()
             ?? throw new InvalidOperationException("Failed to create no skia.");
-    private readonly IReadOnlyCollection<Renderable>? data = data;
+    private readonly IReadOnlyCollection<Node>? data = data;
 
     public void Dispose()
     {
@@ -63,14 +63,14 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
         canvas.Restore();
     }
 
-    private static void Render(Camera2D camera, SKCanvas canvas, Range dataBounds, Renderable item, int offset)
+    private static void Render(Camera2D camera, SKCanvas canvas, Range dataBounds, Node item, int offset)
     {
         switch (item)
         {
             case LabeledRange lr:
                 RenderLabeledRectangle(camera, canvas, dataBounds, offset, lr);
                 break;
-            case StackedRenderable stacked:
+            case StackedNode stacked:
                 foreach (var collection in stacked.Items)
                 {
                     var stack = offset++;
@@ -83,7 +83,7 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
         }
     }
 
-    private static Range Measure(IEnumerable<Renderable> items)
+    private static Range Measure(IEnumerable<Node> items)
     {
         static Range Outer(Range a, Range b) => new(a.From < b.From ? a.From : b.From, a.To > b.To ? a.To : b.To);
 
@@ -93,7 +93,7 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
             result = item switch
             {
                 LabeledRange range => Outer(result, range.Range),
-                StackedRenderable stacked => stacked.Items.Select(Measure).Aggregate(result, Outer),
+                StackedNode stacked => stacked.Items.Select(Measure).Aggregate(result, Outer),
                 _ => throw new NotImplementedException($"Measuring for {item} is not implemented yet."),
             };
         }
