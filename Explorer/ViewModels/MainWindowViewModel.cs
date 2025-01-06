@@ -224,7 +224,9 @@ public class MainWindowViewModel : ReactiveObject
             }
             else
             {
-                output.Add(new LabeledRange("", new(previousTime.Value, QpcToUtc(trace, blob.Blob.TimeStamp), 2, 1, Avalonia.Media.Colors.Green))); 
+                var currentTime = QpcToUtc(trace, blob.Blob.TimeStamp);
+                output.Add(new LabeledRange("", new(previousTime.Value, currentTime, 2, 1, Avalonia.Media.Colors.Green))); 
+                previousTime = currentTime;
             }
         }
     }

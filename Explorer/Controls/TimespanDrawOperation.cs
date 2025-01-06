@@ -122,6 +122,9 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
         canvas.DrawCircle(
             (float)(fromX * camera.Width), (float)fromY, 2,
             new() { Style = SKPaintStyle.Fill, Color = item.Range.Color.Into() } );
+        canvas.DrawCircle(
+            (float)(toX * camera.Width), (float)fromY, 2,
+            new() { Style = SKPaintStyle.Fill, Color = item.Range.Color.Into() } );
     }
     
     private static float ToSeconds(DateTime dateTime)
