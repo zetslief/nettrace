@@ -51,6 +51,7 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
         canvas.Clear(SKColors.Black);
 
         var dataBounds = Measure(new Rect(float.MaxValue, float.MaxValue, float.MinValue, float.MinValue), data);
+        dataBounds = dataBounds with { Right = dataBounds.Left + dataBounds.Width * 0.3f };
         
         Camera2D camera = new(Position.Zero, (float)Bounds.Width, dataBounds.Height, Bounds.Into());
 
@@ -118,7 +119,7 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
         );
         
         canvas.DrawRect(rect, new() { Style = SKPaintStyle.Fill, Color = item.Range.Color.Into() });
-        canvas.DrawRect(rect, new() { Style = SKPaintStyle.Stroke, StrokeWidth = 1, Color = item.Range.Color.Dimmer()});
+        canvas.DrawRect(rect, new() { Style = SKPaintStyle.Stroke, StrokeWidth = 2, Color = item.Range.Color.Dimmer()});
         canvas.DrawCircle(
             (float)(fromX * camera.Width), (float)fromY, 2,
             new() { Style = SKPaintStyle.Fill, Color = item.Range.Color.Into() } );
@@ -153,8 +154,8 @@ public readonly record struct Position(float X, float Y)
 
 public readonly record struct Rect(float Left, float Top, float Right, float Bottom)
 {
-    public float Width { get; } = Right - Left;
-    public float Height { get; } = Bottom - Top;
+    public float Width => Right - Left;
+    public float Height => Bottom - Top;
     
     public override string ToString()
         => $"Rect({Left}, {Top}, {Right}, {Bottom}) | Width {Width} | Height {Height}";
