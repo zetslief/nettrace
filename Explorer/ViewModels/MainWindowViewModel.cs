@@ -10,7 +10,6 @@ using ReactiveUI;
 
 using static Nettrace.NettraceReader;
 using static Nettrace.Helpers;
-using Range = Explorer.Controls.Range;
 
 namespace Explorer.ViewModels;
 

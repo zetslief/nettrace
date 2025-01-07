@@ -11,8 +11,6 @@ using SkiaSharp;
 
 namespace Explorer.Controls;
 
-public record Range(DateTime From, DateTime To, float Y, float Height, Color Color);
-
 public abstract record Node();
 public record Rectangle(Rect Rect, Color Color) : Node();
 public record TreeNode(IReadOnlyCollection<Node> Children) : Node();
