@@ -1,8 +1,6 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Avalonia;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
@@ -12,6 +10,7 @@ using SkiaSharp;
 namespace Explorer.Controls;
 
 public abstract record Node();
+public record Point(Position Position, Color Color) : Node();
 public record Rectangle(Rect Rect, Color Color) : Node();
 public record TreeNode(IReadOnlyCollection<Node> Children) : Node();
 
@@ -27,7 +26,7 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
 
     public Avalonia.Rect Bounds { get; } = bounds;
 
-    public bool HitTest(Point p) => false;
+    public bool HitTest(Avalonia.Point p) => false;
 
     public bool Equals(ICustomDrawOperation? other) => false;
 
@@ -49,29 +48,31 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
         canvas.Clear(SKColors.Black);
 
         var dataBounds = Measure(new Rect(float.MaxValue, float.MaxValue, float.MinValue, float.MinValue), data);
-        dataBounds = dataBounds with { Right = dataBounds.Left + dataBounds.Width * 0.3f };
         
-        Camera2D camera = new(Position.Zero, (float)Bounds.Width, dataBounds.Height, Bounds.Into());
+        Camera2D camera = new(Position.Zero, dataBounds, Bounds.Into());
 
         foreach (var item in data)
         {
-            Render(camera, canvas, dataBounds, item);
+            Render(camera, canvas, item);
         }
 
         canvas.Restore();
     }
 
-    private static void Render(Camera2D camera, SKCanvas canvas, Rect dataBounds, Node item)
+    private static void Render(Camera2D camera, SKCanvas canvas, Node item)
     {
         switch (item)
         {
             case Rectangle rectangle:
-                RenderRectangle(camera, canvas, dataBounds, rectangle);
+                RenderRectangle(camera, canvas, rectangle);
+                break;
+            case Point point:
+                RenderPoint(camera, canvas, point);
                 break;
             case TreeNode stacked:
                 foreach (var collection in stacked.Children)
                 {
-                    Render(camera, canvas, dataBounds, collection);
+                    Render(camera, canvas, collection);
                 }
                 break;
             default:
@@ -81,61 +82,71 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
 
     private static Rect Measure(Rect current, IEnumerable<Node> items)
     {
-        static Rect Outer(Rect a, Rect b) => new(
+        static Rect OuterRectangle(Rect a, Rect b) => new(
             a.Left < b.Left ? a.Left : b.Left,
             a.Top < b.Top ? a.Top : b.Top,
             a.Right > b.Right ? a.Right : b.Right,
             a.Bottom > b.Bottom ? a.Bottom : b.Bottom
+        );
+        static Rect OuterPosition(Rect a, Position p) => new(
+            a.Left < p.X ? a.Left : p.X,
+            a.Top < p.Y ? a.Top : p.Y,
+            a.Right > p.X ? a.Right : p.X,
+            a.Bottom > p.Y ? a.Bottom : p.Y
         );
 
         return items.Aggregate(
             current,
             (result, item) => item switch
             {
-                Rectangle range => Outer(result, range.Rect),
+                Rectangle rectangle => OuterRectangle(result, rectangle.Rect),
+                Point point => OuterPosition(current, point.Position),
                 TreeNode stacked => Measure(result, stacked.Children),
                 _ => throw new NotImplementedException($"Measuring for {item} is not implemented yet."),
             });
     }
-
-    private static void RenderRectangle(Camera2D camera, SKCanvas canvas, Rect dataBounds, Rectangle item)
+    
+    private static void RenderPoint(Camera2D camera, SKCanvas canvas, Point point)
     {
-        var fromX = (item.Rect.Left - dataBounds.Left) / dataBounds.Width;
-        var toX = (item.Rect.Right - dataBounds.Left) / dataBounds.Width;
-        var fromY = camera.ToViewY(item.Rect.Top);
-        var toY = camera.ToViewY(item.Rect.Bottom);
+        var position = camera.ToViewPosition(point.Position);
+        
+        canvas.DrawLine(
+            position.X, position.Y - 15, position.X, position.Y,
+            new() { Style = SKPaintStyle.Stroke, StrokeWidth = 1, Color = point.Color.Dimmer() });
+    }
 
-        SKRect rect = new(
-            (float)(fromX * camera.Width),
-            fromY,
-            (float)(toX * camera.Width),
-            toY
-        );
+    private static void RenderRectangle(Camera2D camera, SKCanvas canvas, Rectangle item)
+    {
+        var (fromX, fromY) = camera.ToViewPosition(new(item.Rect.Left, item.Rect.Top));
+        var (toX, toY) = camera.ToViewPosition(new(item.Rect.Right, item.Rect.Bottom));
+
+        SKRect rect = new(fromX, fromY, toX, toY);
         
         canvas.DrawRect(rect, new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() });
         canvas.DrawRect(rect, new() { Style = SKPaintStyle.Stroke, StrokeWidth = 2, Color = item.Color.Dimmer()});
+        
         canvas.DrawCircle(
-            (float)(fromX * camera.Width), (float)fromY, 2,
+            fromX, fromY, 2,
             new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() } );
         canvas.DrawCircle(
-            (float)(toX * camera.Width), (float)fromY, 2,
+            toX, fromY, 2,
             new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() } );
     }
 }
 
-public sealed class Camera2D(Position position, float width, float height, Rect view)
+public sealed class Camera2D(Position position, Rect data, Rect view)
 {
     private readonly Rect view = view;
     
     public Position Position { get; } = position;
-    public float Width { get; } = width;
-    public float Height { get; } = height;
+    public float Width { get; } = data.Width;
+    public float Height { get; } = data.Height;
     
     public Position ToViewPosition(Position position)
-        => new(view.Width / Width * position.X, view.Height / Height * position.Y);
+        => new((position.X - data.Left) / Width * view.Width, (position.Y - data.Top) / Height * view.Height);
     
     public float ToViewY(float y)
-        => view.Height / Height * y;
+        => (y - data.Top) / Height * view.Height;
 }
 
 public readonly record struct Position(float X, float Y)

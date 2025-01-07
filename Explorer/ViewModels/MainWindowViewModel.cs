@@ -168,7 +168,7 @@ public class MainWindowViewModel : ReactiveObject
     {
         var result = new List<Node>();
 
-        if (eventBlobs?.Count > 1)
+        if (eventBlobs?.Count > 0)
         {
             var eventBlobNodes = new List<Node>();
             BlobsToRanges(trace!, eventBlobs, eventBlobNodes);
@@ -214,19 +214,10 @@ public class MainWindowViewModel : ReactiveObject
 
     private static void BlobsToRanges(Trace trace, IReadOnlyCollection<EventBlobViewModel> blobs, List<Node> output)
     {
-        DateTime? previousTime = null;
-        foreach (var blob in blobs.OrderBy(blob => blob.Blob.TimeStamp))
+        foreach (var blob in blobs)
         {
-            if (previousTime is null)
-            {
-                previousTime = QpcToUtc(trace, blob.Blob.TimeStamp);
-            }
-            else
-            {
-                var currentTime = QpcToUtc(trace, blob.Blob.TimeStamp);
-                output.Add(new Rectangle(new(ToSeconds(previousTime.Value), 2, ToSeconds(currentTime), 3), Avalonia.Media.Colors.Green)); 
-                previousTime = currentTime;
-            }
+            var currentTime = QpcToUtc(trace, blob.Blob.TimeStamp);
+            output.Add(new Point(new(ToSeconds(currentTime), 2.1f), Avalonia.Media.Colors.Green));
         }
     }
     
