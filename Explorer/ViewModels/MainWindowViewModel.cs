@@ -200,7 +200,7 @@ public class MainWindowViewModel : ReactiveObject
     {
         result.AddRange(metadataBlocks
             .OrderBy(block => block.Header.MinTime)
-            .Select(block => new LabeledRange("Metadata Block", new(block.Header.MinTime, block.Header.MaxTime, 0, 1, Avalonia.Media.Colors.Red))));
+            .Select(block => new Rectangle(new(ToSeconds(block.Header.MinTime), 0, ToSeconds(block.Header.MaxTime), 1), Avalonia.Media.Colors.Red)));
     }
 
     private static void EventBlocksToRanges(
@@ -210,7 +210,7 @@ public class MainWindowViewModel : ReactiveObject
     {
         result.AddRange(metadataBlocks
             .OrderBy(block => block.Header.MinTime)
-            .Select(block => new LabeledRange("Event Block", new(block.Header.MinTime, block.Header.MaxTime, 1, 1, Avalonia.Media.Colors.Blue))));
+            .Select(block => new Rectangle(new(ToSeconds(block.Header.MinTime), 1, ToSeconds(block.Header.MaxTime), 2), Avalonia.Media.Colors.Blue)));
     }
 
     private static void BlobsToRanges(Trace trace, IReadOnlyCollection<EventBlobViewModel> blobs, List<Node> output)
@@ -225,9 +225,12 @@ public class MainWindowViewModel : ReactiveObject
             else
             {
                 var currentTime = QpcToUtc(trace, blob.Blob.TimeStamp);
-                output.Add(new LabeledRange("", new(previousTime.Value, currentTime, 2, 1, Avalonia.Media.Colors.Green))); 
+                output.Add(new Rectangle(new(ToSeconds(previousTime.Value), 2, ToSeconds(currentTime), 3), Avalonia.Media.Colors.Green)); 
                 previousTime = currentTime;
             }
         }
     }
+    
+    private static float ToSeconds(DateTime dateTime)
+        => (float)((dateTime - dateTime.Date).Ticks / 10_000_000d);
 }

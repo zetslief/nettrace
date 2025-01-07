@@ -14,7 +14,7 @@ namespace Explorer.Controls;
 public record Range(DateTime From, DateTime To, float Y, float Height, Color Color);
 
 public abstract record Node();
-public record LabeledRange(string Label, Range Range) : Node();
+public record Rectangle(Rect Rect, Color Color) : Node();
 public record TreeNode(IReadOnlyCollection<Node> Children) : Node();
 
 internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSkia, IReadOnlyCollection<Node>? data) : ICustomDrawOperation
@@ -67,8 +67,8 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
     {
         switch (item)
         {
-            case LabeledRange lr:
-                RenderLabeledRectangle(camera, canvas, dataBounds, lr);
+            case Rectangle rectangle:
+                RenderRectangle(camera, canvas, dataBounds, rectangle);
                 break;
             case TreeNode stacked:
                 foreach (var collection in stacked.Children)
@@ -94,22 +94,18 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
             current,
             (result, item) => item switch
             {
-                LabeledRange range => Outer(result, new Rect(
-                    ToSeconds(range.Range.From),
-                    range.Range.Y,
-                    ToSeconds(range.Range.To),
-                    range.Range.Y + range.Range.Height)),
+                Rectangle range => Outer(result, range.Rect),
                 TreeNode stacked => Measure(result, stacked.Children),
                 _ => throw new NotImplementedException($"Measuring for {item} is not implemented yet."),
             });
     }
 
-    private static void RenderLabeledRectangle(Camera2D camera, SKCanvas canvas, Rect dataBounds, LabeledRange item)
+    private static void RenderRectangle(Camera2D camera, SKCanvas canvas, Rect dataBounds, Rectangle item)
     {
-        var fromX = (ToSeconds(item.Range.From) - dataBounds.Left) / dataBounds.Width;
-        var toX = (ToSeconds(item.Range.To) - dataBounds.Left) / dataBounds.Width;
-        var fromY = camera.ToViewY(item.Range.Y);
-        var toY = camera.ToViewY(item.Range.Y + item.Range.Height);
+        var fromX = (item.Rect.Left - dataBounds.Left) / dataBounds.Width;
+        var toX = (item.Rect.Right - dataBounds.Left) / dataBounds.Width;
+        var fromY = camera.ToViewY(item.Rect.Top);
+        var toY = camera.ToViewY(item.Rect.Bottom);
 
         SKRect rect = new(
             (float)(fromX * camera.Width),
@@ -118,18 +114,15 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
             toY
         );
         
-        canvas.DrawRect(rect, new() { Style = SKPaintStyle.Fill, Color = item.Range.Color.Into() });
-        canvas.DrawRect(rect, new() { Style = SKPaintStyle.Stroke, StrokeWidth = 2, Color = item.Range.Color.Dimmer()});
+        canvas.DrawRect(rect, new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() });
+        canvas.DrawRect(rect, new() { Style = SKPaintStyle.Stroke, StrokeWidth = 2, Color = item.Color.Dimmer()});
         canvas.DrawCircle(
             (float)(fromX * camera.Width), (float)fromY, 2,
-            new() { Style = SKPaintStyle.Fill, Color = item.Range.Color.Into() } );
+            new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() } );
         canvas.DrawCircle(
             (float)(toX * camera.Width), (float)fromY, 2,
-            new() { Style = SKPaintStyle.Fill, Color = item.Range.Color.Into() } );
+            new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() } );
     }
-    
-    private static float ToSeconds(DateTime dateTime)
-        => (float)((dateTime - dateTime.Date).Ticks / 10_000_000d);
 }
 
 public sealed class Camera2D(Position position, float width, float height, Rect view)
