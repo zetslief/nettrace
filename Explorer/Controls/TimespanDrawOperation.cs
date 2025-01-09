@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
@@ -14,19 +15,16 @@ public record Point(Position Position, Color Color) : Node();
 public record Rectangle(Rect Rect, Color Color) : Node();
 public record TreeNode(IReadOnlyCollection<Node> Children) : Node();
 
-internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSkia, IReadOnlyCollection<Node>? data) : ICustomDrawOperation
+internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSkia, IReadOnlyCollection<Node> data, IReadOnlyCollection<Node> uiData) : ICustomDrawOperation
 {
     private readonly IImmutableGlyphRunReference _noSkia = noSkia.TryCreateImmutableGlyphRunReference()
             ?? throw new InvalidOperationException("Failed to create no skia.");
-    private readonly IReadOnlyCollection<Node>? data = data;
-
-    public void Dispose()
-    {
-    }
+    private readonly IReadOnlyCollection<Node> data = data;
+    private readonly IReadOnlyCollection<Node> uiData = uiData;
 
     public Avalonia.Rect Bounds { get; } = bounds;
 
-    public bool HitTest(Avalonia.Point p) => false;
+    public bool HitTest(Avalonia.Point p) => Bounds.Contains(p);
 
     public bool Equals(ICustomDrawOperation? other) => false;
 
@@ -39,7 +37,7 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
             return;
         }
 
-        if (data is null || data.Count == 0)
+        if (data.Count + uiData.Count == 0)
             return;
 
         using var lease = leaseFeature.Lease();
@@ -48,15 +46,24 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
         canvas.Clear(SKColors.Black);
 
         var dataBounds = Measure(new Rect(float.MaxValue, float.MaxValue, float.MinValue, float.MinValue), data);
+        if (dataBounds.Left == float.MaxValue) dataBounds = new(0, 0, 1, 1);
+        Console.WriteLine(dataBounds);
         
         Camera2D camera = new(Position.Zero, dataBounds, Bounds.Into());
+        
+        var ui = TranslateUiNode(camera, uiData);
 
-        foreach (var item in data)
+        foreach (var item in data.Concat(ui))
         {
+            Console.WriteLine(item);
             Render(camera, canvas, item);
         }
 
         canvas.Restore();
+    }
+
+    public void Dispose()
+    {
     }
 
     private static void Render(Camera2D camera, SKCanvas canvas, Node item)
@@ -132,6 +139,19 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
             toX, fromY, 2,
             new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() } );
     }
+    
+    private static IEnumerable<Node> TranslateUiNode(Camera2D camera, IEnumerable<Node> nodes)
+        => nodes.Select(node => TranslateUiNode(camera, node));
+    
+    private static Node TranslateUiNode(Camera2D camera, Node node) => node switch
+    {
+        Point point => new Point(camera.FromViewPosition(point.Position), point.Color),
+        Rectangle rect => new Rectangle(Rect.FromPositions(
+            camera.FromViewPosition(new(rect.Rect.Left, rect.Rect.Top)),
+            camera.FromViewPosition(new(rect.Rect.Right, rect.Rect.Bottom))),
+            rect.Color),
+        _ => node,
+    };
 }
 
 public sealed class Camera2D(Position position, Rect data, Rect view)
@@ -144,6 +164,9 @@ public sealed class Camera2D(Position position, Rect data, Rect view)
     
     public Position ToViewPosition(Position position)
         => new((position.X - data.Left) / Width * view.Width, (position.Y - data.Top) / Height * view.Height);
+    
+    public Position FromViewPosition(Position position)
+        => new(position.X / view.Width * data.Width + data.Left, position.Y / view.Height * data.Height + data.Top);
     
     public float ToViewY(float y)
         => (y - data.Top) / Height * view.Height;
@@ -159,6 +182,9 @@ public readonly record struct Rect(float Left, float Top, float Right, float Bot
     public float Width => Right - Left;
     public float Height => Bottom - Top;
     
+    public static Rect FromPositions(Position leftTop, Position rightBottom)
+        => new(leftTop.X, leftTop.Y, rightBottom.X, rightBottom.Y);
+    
     public override string ToString()
         => $"Rect({Left}, {Top}, {Right}, {Bottom}) | Width {Width} | Height {Height}";
 }
@@ -170,6 +196,9 @@ public static class Converters
     
     public static Position FromSkia(this SKPoint point)
         => new(point.X, point.Y);
+    
+    public static Position Into(this Avalonia.Point point)
+        => new((float)point.X, (float)point.Y);
     
     public static SKColor Into(this Avalonia.Media.Color color)
         => new(color.R, color.G, color.B, color.A);

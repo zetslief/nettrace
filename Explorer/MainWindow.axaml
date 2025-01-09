@@ -118,8 +118,8 @@
                 </ListBox>
             </DockPanel>
         </Grid>
-        <Panel Grid.Row="2">
-            <controls:TimespanControl Items="{Binding TimePoints}"/>
+        <Panel Grid.Row="2" Background="White">
+            <controls:TimespanControl Items="{Binding TimePoints}" />
         </Panel>
     </Grid>
 </Window>

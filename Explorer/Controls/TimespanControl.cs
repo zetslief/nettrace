@@ -4,6 +4,7 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
 
@@ -13,18 +14,14 @@ public sealed class TimespanControl : Control
 {
     private readonly GlyphRun _noSkia;
     private IReadOnlyCollection<Node>? items;
+    private Position? pressed = null;
+    private Position? current = null;
 
     public static readonly DirectProperty<TimespanControl, IReadOnlyCollection<Node>?> ItemsProperty = AvaloniaProperty.RegisterDirect<TimespanControl, IReadOnlyCollection<Node>?>(
         "Items",
         owner => owner.items,
         (owner, value) => owner.items = value,
         defaultBindingMode: BindingMode.TwoWay);
-
-    public IReadOnlyCollection<Node>? Items
-    {
-        get => GetValue(ItemsProperty);
-        set => SetValue(ItemsProperty, value);
-    }
 
     public TimespanControl()
     {
@@ -33,10 +30,48 @@ public sealed class TimespanControl : Control
         var glyphs = text.Select(ch => Typeface.Default.GlyphTypeface.GetGlyph(ch)).ToArray();
         _noSkia = new GlyphRun(Typeface.Default.GlyphTypeface, 12, text.AsMemory(), glyphs);
     }
+    
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        pressed = current = null;
+        Dispatcher.UIThread.InvokeAsync(InvalidateVisual, DispatcherPriority.Background);
+        base.OnPointerEntered(e);
+    }
+    
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        pressed = e.GetPosition(this).Into();
+        Console.WriteLine($"Mouse pressed: {pressed}");
+        Dispatcher.UIThread.InvokeAsync(InvalidateVisual, DispatcherPriority.Background);
+        base.OnPointerExited(e);
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        current = e.GetPosition(this).Into();
+        Dispatcher.UIThread.InvokeAsync(InvalidateVisual, DispatcherPriority.Input);
+        base.OnPointerMoved(e);
+    }
+
+    public IReadOnlyCollection<Node>? Items
+    {
+        get => GetValue(ItemsProperty);
+        set => SetValue(ItemsProperty, value);
+    }
 
     public override void Render(DrawingContext context)
     {
-        context.Custom(new TimespanDrawOperation(new Avalonia.Rect(0, 0, Bounds.Width, Bounds.Height), _noSkia, items));
-        Dispatcher.UIThread.InvokeAsync(InvalidateVisual, DispatcherPriority.Background);
+        Node[] uiNodes = (pressed, current) switch 
+        {
+            (not null, not null) => [
+                new Rectangle(new(pressed.Value.X, pressed.Value.Y, current.Value.X, current.Value.Y), Color.FromArgb(90, 50, 100, 50)),
+                new Point(pressed.Value, Colors.Yellow),
+                new Point(current.Value, Colors.Orange),
+            ],
+            (not null, null) => [new Point(pressed.Value, Colors.Red)],
+            (null, not null) => [],
+            (null, null) => []
+        };
+        context.Custom(new TimespanDrawOperation(Bounds, _noSkia, items ?? [], uiNodes));
     }
 }
