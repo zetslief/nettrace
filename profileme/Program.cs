@@ -8,7 +8,13 @@ while (true)
     var time = DateTime.Now;
     ProfileMe.Log.Tick(time);
     Console.WriteLine($"{index++} : {time}");
+    Work(1000);
     await Task.Delay(delay).ConfigureAwait(false);
+}
+
+static void Work(int count)
+{
+    for (int i = 0; i < count; ++i) ProfileMe.Log.Tick(DateTime.Now);
 }
 
 [EventSource(Name = "ProfileMe")]

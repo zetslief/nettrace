@@ -54,7 +54,7 @@ public class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob)
 
 public class MainWindowViewModel : ReactiveObject
 {
-    private string? filePath = "./../perf_100ms.nettrace";
+    private string? filePath = "./../perf_with_work.nettrace";
     private string status = string.Empty;
 
     private Trace? trace;
