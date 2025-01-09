@@ -47,7 +47,6 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
 
         var dataBounds = Measure(new Rect(float.MaxValue, float.MaxValue, float.MinValue, float.MinValue), data);
         if (dataBounds.Left == float.MaxValue) dataBounds = new(0, 0, 1, 1);
-        Console.WriteLine(dataBounds);
         
         Camera2D camera = new(Position.Zero, dataBounds, Bounds.Into());
         
@@ -55,7 +54,6 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
 
         foreach (var item in data.Concat(ui))
         {
-            Console.WriteLine(item);
             Render(camera, canvas, item);
         }
 
