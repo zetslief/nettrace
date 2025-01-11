@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Diagnostics;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
@@ -37,25 +37,31 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
             return;
         }
 
-        if (data.Count + uiData.Count == 0)
-            return;
-
         using var lease = leaseFeature.Lease();
         var canvas = lease.SkCanvas;
 
         canvas.Clear(SKColors.Black);
+        
+        if (data.Count + uiData.Count == 0)
+            return;
 
+        var stopwatch = Stopwatch.StartNew();
         var dataBounds = Measure(new Rect(float.MaxValue, float.MaxValue, float.MinValue, float.MinValue), data);
+        Console.WriteLine($"Measured in {stopwatch.Elapsed.TotalMilliseconds} ms");
         if (dataBounds.Left == float.MaxValue) dataBounds = new(0, 0, 1, 1);
         
         Camera2D camera = new(Position.Zero, dataBounds, Bounds.Into());
         
+        stopwatch.Restart();
         var ui = TranslateUiNode(camera, uiData);
+        Console.WriteLine($"TranslateUiNode in {stopwatch.Elapsed.TotalMilliseconds} ms");
 
+        stopwatch.Restart();
         foreach (var item in data.Concat(ui))
         {
             Render(camera, canvas, item);
         }
+        Console.WriteLine($"Render: {stopwatch.Elapsed.TotalMilliseconds} ms");
 
         canvas.Restore();
     }
