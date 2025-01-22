@@ -49,18 +49,21 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
         var dataBounds = Measure(new Rect(float.MaxValue, float.MaxValue, float.MinValue, float.MinValue), data);
         Console.WriteLine($"Measured in {stopwatch.Elapsed.TotalMilliseconds} ms");
         if (dataBounds.Left == float.MaxValue) dataBounds = new(0, 0, 1, 1);
+        dataBounds = dataBounds with { Right = dataBounds.Left + dataBounds.Width * 0.1f };
         
         Camera2D camera = new(Position.Zero, dataBounds, Bounds.Into());
         
         stopwatch.Restart();
         var ui = TranslateUiNode(camera, uiData);
         Console.WriteLine($"TranslateUiNode in {stopwatch.Elapsed.TotalMilliseconds} ms");
-
+        
         stopwatch.Restart();
+        
         foreach (var item in data.Concat(ui))
         {
             Render(camera, canvas, item);
         }
+        
         Console.WriteLine($"Render: {stopwatch.Elapsed.TotalMilliseconds} ms");
 
         canvas.Restore();
@@ -72,13 +75,20 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
 
     private static void Render(Camera2D camera, SKCanvas canvas, Node item)
     {
+        static bool IsPointInView(Camera2D camera, Position position) => camera.IsInView(position);
+        static bool IsRectangleInView(Camera2D camera, Rect rect)
+            => IsPointInView(camera, new(rect.Left, rect.Top))
+                && IsPointInView(camera, new(rect.Right, rect.Top))
+                && IsPointInView(camera, new(rect.Left, rect.Bottom))
+                && IsPointInView(camera, new(rect.Right, rect.Bottom));
+            
         switch (item)
         {
             case Rectangle rectangle:
-                RenderRectangle(camera, canvas, rectangle);
+                if (IsRectangleInView(camera, rectangle.Rect)) RenderRectangle(camera, canvas, rectangle);
                 break;
             case Point point:
-                RenderPoint(camera, canvas, point);
+                if (IsPointInView(camera, point.Position)) RenderPoint(camera, canvas, point);
                 break;
             case TreeNode stacked:
                 foreach (var collection in stacked.Children)
@@ -172,8 +182,11 @@ public sealed class Camera2D(Position position, Rect data, Rect view)
     public Position FromViewPosition(Position position)
         => new(position.X / view.Width * data.Width + data.Left, position.Y / view.Height * data.Height + data.Top);
     
-    public float ToViewY(float y)
-        => (y - data.Top) / Height * view.Height;
+    public bool IsInView(Position position)
+    {
+        var (x, y) = ToViewPosition(position);
+        return x >= view.Left && x <= view.Right && y >= view.Top && y <= view.Bottom;
+    }
 }
 
 public readonly record struct Position(float X, float Y)
