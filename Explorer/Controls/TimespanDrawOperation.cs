@@ -15,12 +15,18 @@ public record Point(Position Position, Color Color) : Node();
 public record Rectangle(Rect Rect, Color Color) : Node();
 public record TreeNode(IReadOnlyCollection<Node> Children) : Node();
 
-internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSkia, IReadOnlyCollection<Node> data, IReadOnlyCollection<Node> uiData) : ICustomDrawOperation
+internal sealed class TimespanDrawOperation(
+    Avalonia.Rect bounds,
+    GlyphRun noSkia,
+    IReadOnlyCollection<Node> data,
+    IReadOnlyCollection<Node> uiData,
+    Rect? viewport) : ICustomDrawOperation
 {
     private readonly IImmutableGlyphRunReference _noSkia = noSkia.TryCreateImmutableGlyphRunReference()
             ?? throw new InvalidOperationException("Failed to create no skia.");
     private readonly IReadOnlyCollection<Node> data = data;
     private readonly IReadOnlyCollection<Node> uiData = uiData;
+    private readonly Rect? viewport = viewport;
 
     public Avalonia.Rect Bounds { get; } = bounds;
 
@@ -49,9 +55,16 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, GlyphRun noSki
         var dataBounds = Measure(new Rect(float.MaxValue, float.MaxValue, float.MinValue, float.MinValue), data);
         Console.WriteLine($"Measured in {stopwatch.Elapsed.TotalMilliseconds} ms");
         if (dataBounds.Left == float.MaxValue) dataBounds = new(0, 0, 1, 1);
-        dataBounds = dataBounds with { Right = dataBounds.Left + dataBounds.Width * 0.1f };
         
         Camera2D camera = new(Position.Zero, dataBounds, Bounds.Into());
+        
+        if (viewport.HasValue)
+        {
+            var (left, _) = camera.FromViewPosition(new(viewport.Value.Left, 1));
+            var (right, _) = camera.FromViewPosition(new(viewport.Value.Right, 1));
+            dataBounds = dataBounds with { Left = left, Right = right };
+            camera = new(Position.Zero, dataBounds, Bounds.Into());
+        }
         
         stopwatch.Restart();
         var ui = TranslateUiNode(camera, uiData);
