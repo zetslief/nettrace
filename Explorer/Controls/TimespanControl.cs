@@ -98,22 +98,16 @@ public sealed class TimespanControl : Control
     private static Rect? Measure(Rect? current, Node item)
     {
         static Rect OuterRectangle(Rect a, Rect b) => new(
-            a.Left < b.Left ? a.Left : b.Left,
-            a.Top < b.Top ? a.Top : b.Top,
-            a.Right > b.Right ? a.Right : b.Right,
-            a.Bottom > b.Bottom ? a.Bottom : b.Bottom
+            Math.Min(a.Left, b.Left), Math.Min(a.Top, b.Top),
+            Math.Max(a.Right, b.Right), Math.Max(a.Bottom, b.Bottom)
         );
         
         static Rect OuterPosition(Rect a, Position p) => new(
-            a.Left < p.X ? a.Left : p.X,
-            a.Top < p.Y ? a.Top : p.Y,
-            a.Right > p.X ? a.Right : p.X,
-            a.Bottom > p.Y ? a.Bottom : p.Y
+            Math.Min(a.Left, p.X), Math.Min(a.Top, p.Y),
+            Math.Max(a.Right, p.X), Math.Max(a.Bottom, p.Y)
         );
         
-        static Rect RectangleFromPosition(Position p) => new(
-            p.X - 10, p.Y - 10, p.X + 10, p.Y + 10
-        );
+        static Rect RectangleFromPosition(Position p) => new(p.X, p.Y, p.X, p.Y);
 
         return item switch
         {
