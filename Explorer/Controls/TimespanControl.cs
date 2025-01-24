@@ -13,35 +13,31 @@ namespace Explorer.Controls;
 
 public sealed class TimespanControl : Control
 {
-    private readonly GlyphRun _noSkia;
-    private IReadOnlyCollection<Node>? items;
-    private Rect? viewport = default;
+    private Node? dataNode = null;
+    private Rect? viewport = null;
     private Position? pressed = null;
     private Position? current = null;
 
-    public static readonly DirectProperty<TimespanControl, IReadOnlyCollection<Node>?> ItemsProperty = AvaloniaProperty.RegisterDirect<TimespanControl, IReadOnlyCollection<Node>?>(
-        nameof(Items),
-        owner => owner.items,
-        (owner, value) => owner.items = value,
+    public static readonly DirectProperty<TimespanControl, Node?> DataNodeProperty = AvaloniaProperty.RegisterDirect<TimespanControl, Node?>(
+        nameof(DataNode),
+        owner => owner.dataNode,
+        (owner, value) => owner.dataNode = value,
         defaultBindingMode: BindingMode.TwoWay);
     
     public TimespanControl()
     {
         ClipToBounds = true;
-        var text = "Current rendering API is not Skia";
-        var glyphs = text.Select(ch => Typeface.Default.GlyphTypeface.GetGlyph(ch)).ToArray();
-        _noSkia = new GlyphRun(Typeface.Default.GlyphTypeface, 12, text.AsMemory(), glyphs);
     }
 
-    public IReadOnlyCollection<Node>? Items
+    public Node? DataNode
     {
-        get => GetValue(ItemsProperty);
-        set => SetValue(ItemsProperty, value);
+        get => GetValue(DataNodeProperty);
+        set => SetValue(DataNodeProperty, value);
     }
 
     public override void Render(DrawingContext context)
     {
-        Node[] uiNodes = (pressed, current) switch 
+        var uiNode = new TreeNode((pressed, current) switch 
         {
             (not null, not null) => [
                 new Rectangle(new(pressed.Value.X, pressed.Value.Y, current.Value.X, current.Value.Y), Color.FromArgb(90, 50, 100, 50)),
@@ -51,8 +47,24 @@ public sealed class TimespanControl : Control
             (not null, null) => [new Point(pressed.Value, Colors.Red)],
             (null, not null) => [],
             (null, null) => []
-        };
-        context.Custom(new TimespanDrawOperation(Bounds, _noSkia, items ?? [], uiNodes, viewport));
+        });
+        
+        if (uiNode.Children.Count > 0)
+        {
+            var uiCamera = new Camera2D(Position.Zero, Bounds.Into(), Bounds.Into());
+            context.Custom(new TimespanDrawOperation(Bounds, uiCamera, uiNode));
+        }
+        
+        if (dataNode is null) return;
+        
+        if (!TryMeasure(dataNode, out var dataBounds))
+        {
+            dataBounds = new(0, 0, 1000, 100);
+        }
+        
+        var dataCamera = new Camera2D(Position.Zero, dataBounds, Bounds.Into());
+        
+        context.Custom(new TimespanDrawOperation(Bounds, dataCamera, dataNode)); 
     }
     
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -84,5 +96,36 @@ public sealed class TimespanControl : Control
         current = e.GetPosition(this).Into();
         Dispatcher.UIThread.InvokeAsync(InvalidateVisual, DispatcherPriority.Input);
         base.OnPointerMoved(e);
+    }
+    
+    private static bool TryMeasure(Node node, out Rect measurement)
+    {
+        measurement = Measure(new(0, 0, 0, 0), node);
+        return measurement is { Height: 0, Width: 0 };
+    }
+    
+    private static Rect Measure(Rect current, Node item)
+    {
+        static Rect OuterRectangle(Rect a, Rect b) => new(
+            a.Left < b.Left ? a.Left : b.Left,
+            a.Top < b.Top ? a.Top : b.Top,
+            a.Right > b.Right ? a.Right : b.Right,
+            a.Bottom > b.Bottom ? a.Bottom : b.Bottom
+        );
+        
+        static Rect OuterPosition(Rect a, Position p) => new(
+            a.Left < p.X ? a.Left : p.X,
+            a.Top < p.Y ? a.Top : p.Y,
+            a.Right > p.X ? a.Right : p.X,
+            a.Bottom > p.Y ? a.Bottom : p.Y
+        );
+
+        return item switch
+        {
+            Rectangle rectangle => OuterRectangle(current, rectangle.Rect),
+            Point point => OuterPosition(current, point.Position),
+            TreeNode stacked => stacked.Children.Select(s => Measure(current, s)).Aggregate(current, OuterRectangle),
+            _ => throw new NotImplementedException($"Measuring for {item} is not implemented yet."),
+        };
     }
 }

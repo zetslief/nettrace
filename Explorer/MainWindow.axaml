@@ -119,7 +119,7 @@
             </DockPanel>
         </Grid>
         <Panel Grid.Row="2">
-            <controls:TimespanControl Items="{Binding TimePoints}" />
+            <controls:TimespanControl DataNode="{Binding TimePoints}" />
         </Panel>
     </Grid>
 </Window>

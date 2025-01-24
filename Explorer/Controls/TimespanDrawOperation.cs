@@ -15,18 +15,9 @@ public record Point(Position Position, Color Color) : Node();
 public record Rectangle(Rect Rect, Color Color) : Node();
 public record TreeNode(IReadOnlyCollection<Node> Children) : Node();
 
-internal sealed class TimespanDrawOperation(
-    Avalonia.Rect bounds,
-    GlyphRun noSkia,
-    IReadOnlyCollection<Node> data,
-    IReadOnlyCollection<Node> uiData,
-    Rect? viewport) : ICustomDrawOperation
+internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, Camera2D camera, Node? data) : ICustomDrawOperation
 {
-    private readonly IImmutableGlyphRunReference _noSkia = noSkia.TryCreateImmutableGlyphRunReference()
-            ?? throw new InvalidOperationException("Failed to create no skia.");
-    private readonly IReadOnlyCollection<Node> data = data;
-    private readonly IReadOnlyCollection<Node> uiData = uiData;
-    private readonly Rect? viewport = viewport;
+    private readonly Node? data = data;
 
     public Avalonia.Rect Bounds { get; } = bounds;
 
@@ -39,7 +30,6 @@ internal sealed class TimespanDrawOperation(
         var leaseFeature = context.TryGetFeature<ISkiaSharpApiLeaseFeature>();
         if (leaseFeature == null)
         {
-            context.DrawGlyphRun(Brushes.Black, _noSkia);
             return;
         }
 
@@ -48,34 +38,12 @@ internal sealed class TimespanDrawOperation(
 
         canvas.Clear(SKColors.Black);
         
-        if (data.Count + uiData.Count == 0)
+        if (data is null)
             return;
 
         var stopwatch = Stopwatch.StartNew();
-        var dataBounds = Measure(new Rect(float.MaxValue, float.MaxValue, float.MinValue, float.MinValue), data);
-        Console.WriteLine($"Measured in {stopwatch.Elapsed.TotalMilliseconds} ms");
-        if (dataBounds.Left == float.MaxValue) dataBounds = new(0, 0, 1, 1);
         
-        Camera2D camera = new(Position.Zero, dataBounds, Bounds.Into());
-        
-        if (viewport.HasValue)
-        {
-            var (left, _) = camera.FromViewPosition(new(viewport.Value.Left, 1));
-            var (right, _) = camera.FromViewPosition(new(viewport.Value.Right, 1));
-            dataBounds = dataBounds with { Left = left, Right = right };
-            camera = new(Position.Zero, dataBounds, Bounds.Into());
-        }
-        
-        stopwatch.Restart();
-        var ui = TranslateUiNode(camera, uiData);
-        Console.WriteLine($"TranslateUiNode in {stopwatch.Elapsed.TotalMilliseconds} ms");
-        
-        stopwatch.Restart();
-        
-        foreach (var item in data.Concat(ui))
-        {
-            Render(camera, canvas, item);
-        }
+        Render(camera, canvas, data);
         
         Console.WriteLine($"Render: {stopwatch.Elapsed.TotalMilliseconds} ms");
 
@@ -114,7 +82,7 @@ internal sealed class TimespanDrawOperation(
         }
     }
 
-    private static Rect Measure(Rect current, IEnumerable<Node> items)
+    private static Rect Measure(Rect current, Node item)
     {
         static Rect OuterRectangle(Rect a, Rect b) => new(
             a.Left < b.Left ? a.Left : b.Left,
@@ -122,6 +90,7 @@ internal sealed class TimespanDrawOperation(
             a.Right > b.Right ? a.Right : b.Right,
             a.Bottom > b.Bottom ? a.Bottom : b.Bottom
         );
+        
         static Rect OuterPosition(Rect a, Position p) => new(
             a.Left < p.X ? a.Left : p.X,
             a.Top < p.Y ? a.Top : p.Y,
@@ -129,15 +98,13 @@ internal sealed class TimespanDrawOperation(
             a.Bottom > p.Y ? a.Bottom : p.Y
         );
 
-        return items.Aggregate(
-            current,
-            (result, item) => item switch
-            {
-                Rectangle rectangle => OuterRectangle(result, rectangle.Rect),
-                Point point => OuterPosition(current, point.Position),
-                TreeNode stacked => Measure(result, stacked.Children),
-                _ => throw new NotImplementedException($"Measuring for {item} is not implemented yet."),
-            });
+        return item switch
+        {
+            Rectangle rectangle => OuterRectangle(current, rectangle.Rect),
+            Point point => OuterPosition(current, point.Position),
+            TreeNode stacked => stacked.Children.Select(s => Measure(current, s)).Aggregate(OuterRectangle),
+            _ => throw new NotImplementedException($"Measuring for {item} is not implemented yet."),
+        };
     }
     
     private static void RenderPoint(Camera2D camera, SKCanvas canvas, Point point)

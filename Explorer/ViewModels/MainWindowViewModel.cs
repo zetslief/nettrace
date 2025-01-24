@@ -69,7 +69,7 @@ public class MainWindowViewModel : ReactiveObject
     private EventBlobViewModel[]? allEventBlobs;
 
     private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> eventBlobs;
-    private readonly ObservableAsPropertyHelper<IReadOnlyCollection<Node>> timePoints;
+    private readonly ObservableAsPropertyHelper<Node> timePoints;
 
     public MainWindowViewModel()
     {
@@ -124,7 +124,7 @@ public class MainWindowViewModel : ReactiveObject
 
     public IReadOnlyCollection<EventBlobViewModel>? EventBlobs => eventBlobs.Value;
 
-    public IReadOnlyCollection<Node> TimePoints => timePoints.Value;
+    public Node TimePoints => timePoints.Value;
 
     public string Status
     {
@@ -161,7 +161,7 @@ public class MainWindowViewModel : ReactiveObject
         Status = $"Read {stream.Position} bytes";
     }
 
-    private IReadOnlyCollection<Node> ToLabeledRanges(
+    private Node ToLabeledRanges(
         IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks,
         IReadOnlyCollection<EventBlockViewModel>? eventBlocks,
         IReadOnlyCollection<EventBlobViewModel>? eventBlobs)
@@ -189,7 +189,7 @@ public class MainWindowViewModel : ReactiveObject
             result.Add(new TreeNode(metadataBlockNodes));
         }
 
-        return [new TreeNode(result)];
+        return new TreeNode(result);
     }
 
     private static void MetadataBlocksToRanges(
