@@ -49,22 +49,18 @@ public sealed class TimespanControl : Control
             (null, null) => []
         });
         
-        if (uiNode.Children.Count > 0)
+        var uiCamera = new Camera2D(Position.Zero, Bounds.Into(), Bounds.Into());
+        
+        List<(Camera2D, Node)> renderItems = [(uiCamera, uiNode)];
+        
+        if (dataNode is not null)
         {
-            var uiCamera = new Camera2D(Position.Zero, Bounds.Into(), Bounds.Into());
-            context.Custom(new TimespanDrawOperation(Bounds, uiCamera, uiNode));
+            var dataBounds = Measure(null, dataNode) ?? new(0, 0, 1000, 100);
+            var dataCamera = new Camera2D(Position.Zero, dataBounds, Bounds.Into());
+            renderItems.Add((dataCamera, dataNode));
         }
         
-        if (dataNode is null) return;
-        
-        if (!TryMeasure(dataNode, out var dataBounds))
-        {
-            dataBounds = new(0, 0, 1000, 100);
-        }
-        
-        var dataCamera = new Camera2D(Position.Zero, dataBounds, Bounds.Into());
-        
-        context.Custom(new TimespanDrawOperation(Bounds, dataCamera, dataNode)); 
+        context.Custom(new TimespanDrawOperation(Bounds, renderItems)); 
     }
     
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -98,13 +94,7 @@ public sealed class TimespanControl : Control
         base.OnPointerMoved(e);
     }
     
-    private static bool TryMeasure(Node node, out Rect measurement)
-    {
-        measurement = Measure(new(0, 0, 0, 0), node);
-        return measurement is { Height: 0, Width: 0 };
-    }
-    
-    private static Rect Measure(Rect current, Node item)
+    private static Rect? Measure(Rect? current, Node item)
     {
         static Rect OuterRectangle(Rect a, Rect b) => new(
             a.Left < b.Left ? a.Left : b.Left,
@@ -119,12 +109,24 @@ public sealed class TimespanControl : Control
             a.Right > p.X ? a.Right : p.X,
             a.Bottom > p.Y ? a.Bottom : p.Y
         );
+        
+        static Rect RectangleFromPosition(Position p) => new(
+            p.X - 100, p.Y - 100, p.X + 100, p.Y + 100
+        );
 
         return item switch
         {
-            Rectangle rectangle => OuterRectangle(current, rectangle.Rect),
-            Point point => OuterPosition(current, point.Position),
-            TreeNode stacked => stacked.Children.Select(s => Measure(current, s)).Aggregate(current, OuterRectangle),
+            Rectangle rectangle => current is null ? rectangle.Rect : OuterRectangle(current.Value, rectangle.Rect),
+            Point point => current is null ? RectangleFromPosition(point.Position) : OuterPosition(current.Value, point.Position),
+            TreeNode stacked => stacked.Children
+                .Select(s => Measure(current, s))
+                .Aggregate(current, (l, r) => (l, r) switch
+                {
+                    (null, null) => null,
+                    (var left, null) => left,
+                    (null, var right) => right,
+                    var (left, right) => OuterRectangle(left.Value, right.Value),
+                }),
             _ => throw new NotImplementedException($"Measuring for {item} is not implemented yet."),
         };
     }
