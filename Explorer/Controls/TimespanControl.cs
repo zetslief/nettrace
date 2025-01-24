@@ -51,13 +51,14 @@ public sealed class TimespanControl : Control
         
         var uiCamera = new Camera2D(Position.Zero, Bounds.Into(), Bounds.Into());
         
-        List<(Camera2D, Node)> renderItems = [(uiCamera, uiNode)];
+        Stack<(Camera2D, Node)> renderItems = [];
+        renderItems.Push((uiCamera, uiNode));
         
         if (dataNode is not null)
         {
             var dataBounds = Measure(null, dataNode) ?? new(0, 0, 1000, 100);
             var dataCamera = new Camera2D(Position.Zero, dataBounds, Bounds.Into());
-            renderItems.Add((dataCamera, dataNode));
+            renderItems.Push((dataCamera, dataNode));
         }
         
         context.Custom(new TimespanDrawOperation(Bounds, renderItems)); 
@@ -111,7 +112,7 @@ public sealed class TimespanControl : Control
         );
         
         static Rect RectangleFromPosition(Position p) => new(
-            p.X - 100, p.Y - 100, p.X + 100, p.Y + 100
+            p.X - 10, p.Y - 10, p.X + 10, p.Y + 10
         );
 
         return item switch
