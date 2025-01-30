@@ -14,6 +14,7 @@ namespace Explorer.Controls;
 public sealed class TimespanControl : Control
 {
     private Node? dataNode = null;
+    private Rect dataBounds = new(0, 0, 1000, 100);
     private Rect? viewport = null;
     private Position? pressed = null;
     private Position? current = null;
@@ -23,18 +24,6 @@ public sealed class TimespanControl : Control
         owner => owner.dataNode,
         SetDataNodeProperty,
         defaultBindingMode: BindingMode.TwoWay);
-    
-    private static void SetDataNodeProperty(TimespanControl owner, Node? value)
-    {
-        owner.dataNode = value;
-        Console.WriteLine($"Data Node is updated: {value}");
-        
-        if (value is not null)
-        {
-            owner.viewport = Measure(null, value);
-            Console.WriteLine($"Viewport is measured: {owner.viewport}");
-        }
-    }
     
     public TimespanControl()
     {
@@ -68,8 +57,7 @@ public sealed class TimespanControl : Control
         
         if (dataNode is not null)
         {
-            var dataBounds = Measure(null, dataNode) ?? new(0, 0, 1000, 100);
-            var dataCamera = new Camera2D(Position.Zero, dataBounds, Bounds.Into());
+            var dataCamera = new Camera2D(Position.Zero, viewport ?? dataBounds, Bounds.Into());
             renderItems.Push((dataCamera, dataNode));
         }
         
@@ -81,12 +69,18 @@ public sealed class TimespanControl : Control
         if (e.InitialPressMouseButton == MouseButton.Right)
         {
             pressed = current = null;
-            viewport = null;
+            viewport = dataBounds;
+            Console.WriteLine($"Viewport is reset to data bounds: {dataBounds}");
             return;
         }
+        
         Debug.Assert(pressed is not null);
         current = e.GetPosition(this).Into();
-        viewport = (viewport ?? new Rect()) with { Left = pressed.Value.X, Right = current.Value.X };
+        var currentCamera = new Camera2D(Position.Zero, viewport ?? dataBounds, Bounds.Into());
+        var pressedView = currentCamera.FromViewPosition(pressed.Value);
+        var currentView = currentCamera.FromViewPosition(current.Value);
+        viewport = (viewport ?? new Rect()) with { Left = pressedView.X, Right = currentView.X };
+        Console.WriteLine($"Viewport is updated: {viewport}");
         pressed = current = null;
         Dispatcher.UIThread.InvokeAsync(InvalidateVisual, DispatcherPriority.Background);
         base.OnPointerEntered(e);
@@ -103,8 +97,21 @@ public sealed class TimespanControl : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         current = e.GetPosition(this).Into();
-        Dispatcher.UIThread.InvokeAsync(InvalidateVisual, DispatcherPriority.Input);
         base.OnPointerMoved(e);
+        Dispatcher.UIThread.InvokeAsync(InvalidateVisual, DispatcherPriority.Input);
+    }
+    
+    private static void SetDataNodeProperty(TimespanControl owner, Node? value)
+    {
+        owner.dataNode = value;
+        Console.WriteLine($"Data Node is updated: {value}");
+        
+        if (value is not null)
+        {
+            owner.dataBounds = Measure(null, value) ?? new(0, 0, 1000, 100);
+            owner.viewport = owner.dataBounds;
+            Console.WriteLine($"Viewport is measured: {owner.viewport}");
+        }
     }
     
     private static Rect? Measure(Rect? current, Node item)
