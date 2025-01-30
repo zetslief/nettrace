@@ -21,8 +21,20 @@ public sealed class TimespanControl : Control
     public static readonly DirectProperty<TimespanControl, Node?> DataNodeProperty = AvaloniaProperty.RegisterDirect<TimespanControl, Node?>(
         nameof(DataNode),
         owner => owner.dataNode,
-        (owner, value) => owner.dataNode = value,
+        SetDataNodeProperty,
         defaultBindingMode: BindingMode.TwoWay);
+    
+    private static void SetDataNodeProperty(TimespanControl owner, Node? value)
+    {
+        owner.dataNode = value;
+        Console.WriteLine($"Data Node is updated: {value}");
+        
+        if (value is not null)
+        {
+            owner.viewport = Measure(null, value);
+            Console.WriteLine($"Viewport is measured: {owner.viewport}");
+        }
+    }
     
     public TimespanControl()
     {
