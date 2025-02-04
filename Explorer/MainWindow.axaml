@@ -8,9 +8,11 @@
     x:Class="Explorer.MainWindow"
     x:DataType="vm:MainWindowViewModel"
     Title="Explorer">
+    
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
+    
     <Window.DataTemplates>
         <DataTemplate DataType="{x:Type vm:MetadataBlockViewModel}">
             <StackPanel>
@@ -87,20 +89,18 @@
             </StackPanel>
         </DataTemplate>
     </Window.DataTemplates>
-    <Grid
-        RowDefinitions="Auto,8*,4*">
-        <StackPanel Orientation="Horizontal"
-            Grid.Row="0">
+    
+    <Grid RowDefinitions="Auto,8*,4*">
+        <DockPanel>
             <TextBox Text="{Binding FilePath}"
                 Watermark="Enter a file path"/>
             <Button Command="{Binding WelcomeCommand}"
                 Content="Read"/>
             <TextBlock Text="{Binding Status}"/>
-        </StackPanel>
+        </DockPanel>
         <Grid ColumnDefinitions="2*,2*,6*,2*"
             Grid.Row="1">
-            <DockPanel
-                Grid.Column="0">
+            <DockPanel Grid.Column="0">
                 <TextBlock Text="Metadata Blocks"
                     DockPanel.Dock="Top"/>
                 <ListBox ItemsSource="{Binding MetadataBlocks}"
