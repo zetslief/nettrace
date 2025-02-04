@@ -12,6 +12,32 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
     <Window.DataTemplates>
+        <DataTemplate DataType="{x:Type vm:MetadataBlockViewModel}">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Metadata Block: "/>
+                            <TextBlock Text="{Binding Blobs.Count}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Min: "/>
+                            <TextBlock
+                                Text="{Binding Header.MinTime, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Max: "/>
+                            <TextBlock
+                                Text="{Binding Header.MaxTime, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Duration"/>
+                            <TextBlock Text="{Binding Header.Duration}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:MetadataEventBlobViewModel}">
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
@@ -51,30 +77,6 @@
                 <ListBox ItemsSource="{Binding MetadataBlocks}"
                     SelectedItem="{Binding SelectedMetadataBlock}"
                     SelectionMode="Single">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate DataType="{x:Type vm:MetadataBlockViewModel}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="Metadata Block: "/>
-                                    <TextBlock Text="{Binding Blobs.Count}"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="Min: "/>
-                                    <TextBlock
-                                        Text="{Binding Header.MinTime, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="Max: "/>
-                                    <TextBlock
-                                        Text="{Binding Header.MaxTime, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="Duration"/>
-                                    <TextBlock Text="{Binding Header.Duration}"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
                 </ListBox>
             </DockPanel>
             <DockPanel Grid.Column="1">
