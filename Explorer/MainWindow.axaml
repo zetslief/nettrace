@@ -57,6 +57,13 @@
                 </StackPanel>
             </StackPanel>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:EventBlobViewModel}">
+            <StackPanel>
+                <TextBlock Text="{Binding}"
+                    TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding Timestamp, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
+            </StackPanel>
+        </DataTemplate>
     </Window.DataTemplates>
     <Grid
         RowDefinitions="Auto,8*,4*">
@@ -76,8 +83,7 @@
                     DockPanel.Dock="Top"/>
                 <ListBox ItemsSource="{Binding MetadataBlocks}"
                     SelectedItem="{Binding SelectedMetadataBlock}"
-                    SelectionMode="Single">
-                </ListBox>
+                    SelectionMode="Single" />
             </DockPanel>
             <DockPanel Grid.Column="1">
                 <TextBlock Text="Metadata Blobs"
@@ -89,17 +95,8 @@
             <DockPanel Grid.Column="2">
                 <TextBlock Text="Event Blobs"
                     DockPanel.Dock="Top"/>
-                <ListBox ItemsSource="{Binding EventBlobs}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel>
-                                <TextBlock Text="{Binding}"
-                                    TextWrapping="Wrap"/>
-                                <TextBlock Text="{Binding Timestamp, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                <ListBox ItemsSource="{Binding EventBlobs}"
+                    SelectionMode="Single" />
             </DockPanel>
             <DockPanel Grid.Column="3">
                 <TextBlock Text="Event Blocks"
