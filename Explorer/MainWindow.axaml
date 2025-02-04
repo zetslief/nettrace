@@ -13,8 +13,19 @@
     </Design.DataContext>
     <Window.DataTemplates>
         <DataTemplate DataType="{x:Type vm:MetadataEventBlobViewModel}">
-            <TextBlock Text="{Binding}"
-                TextWrapping="Wrap"/>
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding Payload.Header.ProviderName}"/>
+                    <TextBlock Text=" - "/>
+                    <TextBlock Text="{Binding Payload.Header.EventName}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Time: " />
+                    <TextBlock Text="{Binding Blob.TimeStamp}" />
+                    <TextBlock Text=" | Flags" />
+                    <TextBlock Text="{Binding Blob.Flags}" />
+                </StackPanel>
+            </StackPanel>
         </DataTemplate>
     </Window.DataTemplates>
     <Grid

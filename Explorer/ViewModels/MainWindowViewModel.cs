@@ -24,11 +24,10 @@ public class MetadataBlockViewModel(Trace trace, Block<MetadataEvent> metadata)
 
 public class MetadataEventBlobViewModel(EventBlob<MetadataEvent> blob)
 {
-    private readonly EventBlob<MetadataEvent> blob = blob;
+    public EventBlob<MetadataEvent> Blob { get; } = blob;
+    public MetadataEvent Payload { get; } = blob.Payload;
 
-    public MetadataEvent Payload => blob.Payload;
-
-    public override string ToString() => blob.ToString();
+    public override string ToString() => Blob.ToString();
 }
 
 public sealed class BlockHeaderViewModel(Trace trace, Header header)
