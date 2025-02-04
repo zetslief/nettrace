@@ -11,6 +11,12 @@
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
+    <Window.DataTemplates>
+        <DataTemplate DataType="{x:Type vm:MetadataEventBlobViewModel}">
+            <TextBlock Text="{Binding}"
+                TextWrapping="Wrap"/>
+        </DataTemplate>
+    </Window.DataTemplates>
     <Grid
         RowDefinitions="Auto,8*,4*">
         <StackPanel Orientation="Horizontal"
@@ -61,15 +67,7 @@
                     DockPanel.Dock="Top"/>
                 <ListBox ItemsSource="{Binding MetadataEventBlobs}"
                     SelectedItem="{Binding SelectedMetadataEventBlob}"
-                    SelectionMode="Single"
-                    Grid.Column="1">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding}"
-                                TextWrapping="Wrap"/>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
+                    SelectionMode="Single" />
             </DockPanel>
             <DockPanel Grid.Column="2">
                 <TextBlock Text="Event Blobs"
