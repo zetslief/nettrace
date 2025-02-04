@@ -25,6 +25,10 @@
                     <TextBlock Text=" | Flags" />
                     <TextBlock Text="{Binding Blob.Flags}" />
                 </StackPanel>
+                <StackPanel IsVisible="{Binding $parent[ListBoxItem].IsSelected}">
+                    <TextBlock Text="{Binding .}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
             </StackPanel>
         </DataTemplate>
     </Window.DataTemplates>
