@@ -71,24 +71,11 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:EventBlockViewModel}">
             <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Event Block: "/>
-                    <TextBlock Text="{Binding BlobCount}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Min: "/>
-                    <TextBlock
-                        Text="{Binding Header.MinTime, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Max: "/>
-                    <TextBlock
-                        Text="{Binding Header.MaxTime, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Duration"/>
-                    <TextBlock Text="{Binding Header.Duration}"/>
-                </StackPanel>
+                <TextBlock Text="Event Block: "/>
+                <TextBlock Text="{Binding BlobCount, StringFormat='Event Blob Count: {0}'}"/>
+                <TextBlock Text="{Binding Header.MinTime, StringFormat='Min Timestamp: {0:dd/MM/yyyy HH:mm:ss.ffff}'}"/>
+                <TextBlock Text="{Binding Header.MinTime, StringFormat='Max Timestamp: {0:dd/MM/yyyy HH:mm:ss.ffff}'}"/>
+                <TextBlock Text="{Binding Header.Duration, StringFormat='Duration: {0}'}"/>
             </StackPanel>
         </DataTemplate>
     </Window.DataTemplates>
