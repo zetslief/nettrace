@@ -1,4 +1,6 @@
 ﻿using System.Diagnostics;
+using System.Net.Sockets;
+using System.Threading;
 
 var process = Process.GetProcessesByName("profileMe").Single();
 
@@ -19,3 +21,11 @@ If /proc/$PID/stat is available (all other *nix platforms), then the process sta
 
 var file = Directory.GetFiles(directory, $"dotnet-diagnostic-{process.Id}-*").Single();
 Console.WriteLine($"File: {file}");
+
+using CancellationTokenSource cts = new();
+using Socket socket = new(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+var endpoint = new UnixDomainSocketEndPoint(file);
+
+await socket.ConnectAsync(endpoint, cts.Token);
+
+Console.WriteLine($"Connected? {socket.Connected}");
