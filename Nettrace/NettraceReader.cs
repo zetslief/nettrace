@@ -130,14 +130,7 @@ public static class NettraceReader
         Span<byte> magic = stackalloc byte[8];
         stream.ReadExactly(magic);
 
-        Console.Write("Magic: ");
-        Fmt.BytesHex(magic);
-        Console.WriteLine($" -> {Encoding.UTF8.GetString(magic)}");
-
         var streamHeader = ReadString(stream);
-
-        Console.Write("StreamHeader: ");
-        Console.WriteLine(streamHeader);
 
         Trace? trace = null;
         Type? traceType = null;
@@ -153,8 +146,6 @@ public static class NettraceReader
                 case "Trace":
                     traceType = type;
                     trace = TraceDecoder(stream);
-                    Console.WriteLine(type);
-                    Console.WriteLine(trace);
                     break;
                 case "MetadataBlock":
                     Debug.Assert(traceType is not null);
@@ -186,6 +177,12 @@ public static class NettraceReader
             [.. eventBlocks],
             stack ?? throw new InvalidOperationException("File doesn't contain stack."),
             sequencePointBlock ?? throw new InvalidOperationException("File dosn't contain SPB."));
+    }
+
+    public static (Type, Trace) ReadTrace(Stream stream)
+    {
+        TryStartObject(stream, out var t);
+        return (t!, TraceDecoder(stream));
     }
 
     private static bool TryStartObject(Stream stream, out Type? type)
@@ -477,7 +474,7 @@ public static class NettraceReader
 
     private static Tag ReadTag(Stream stream) => (Tag)ReadByte(stream);
 
-    private static string ReadString(Stream stream)
+    public static string ReadString(Stream stream)
     {
         var length = ReadInt32(stream);
         Span<byte> content = new byte[length];

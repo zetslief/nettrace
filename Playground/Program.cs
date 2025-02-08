@@ -2,7 +2,7 @@
 using System.Net.Sockets;
 using System.Text;
 using System.Buffers.Binary;
-using System.Diagnostics.CodeAnalysis;
+using Nettrace;
 
 const int HEADER_SIZE = 20;
 
@@ -53,12 +53,25 @@ var maybeError = TryReadCollectTracingResponse(responseMemory.AsSpan(0, response
 if (maybeError.HasValue) throw new InvalidOperationException($"Failed to get collect tracing response: {maybeError}");
 Console.WriteLine($"Session Id: {sessionId}");
 
+bool readTrace = true; 
+
 while (true)
 {
-    var nettrace = new byte[4096];
+    var nettrace = new byte[1024 * 4];
     var read = await socket.ReceiveAsync(nettrace);
     Console.WriteLine($"Receive {read} bytes");
     Console.WriteLine(Encoding.UTF8.GetString(nettrace.AsSpan(..read)));
+
+    using var stream = new MemoryStream(nettrace[8..read]);
+    if (readTrace)
+    {
+        var streamHeader = NettraceReader.ReadString(stream);
+        var (type, trace) = NettraceReader.ReadTrace(stream);
+        Console.WriteLine(streamHeader);
+        Console.WriteLine(type);
+        Console.WriteLine(trace);
+        readTrace = false;
+    }
 }
 
 static ReadOnlyMemory<byte>? TryCollectTracingCommand(IReadOnlyCollection<Provider> providers)
@@ -90,7 +103,7 @@ static ReadOnlyMemory<byte>? TryCollectTracingCommand(IReadOnlyCollection<Provid
 
     var cursor = 20;
 
-    uint circularBufferMb = 1024;
+    uint circularBufferMb = 1;
     if (!BinaryPrimitives.TryWriteUInt32LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], circularBufferMb))
         return null;
 
