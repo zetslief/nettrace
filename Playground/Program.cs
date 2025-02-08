@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
+using System.Buffers.Binary;
 
 const int HEADER_SIZE = 20;
 
@@ -36,10 +37,13 @@ IReadOnlyCollection<Provider> providers =
     new("ProfileMe", 0, 0, string.Empty),
 ];
 
-bool sent = await TryCollectTracingCommand(socket.SendAsync, providers);
-if (!sent) throw new InvalidOperationException("Failed to send CollectTracing command.");
+var buffer = TryCollectTracingCommand(providers)
+    ?? throw new InvalidOperationException("Failed to create buffer for CollectTracing command.");
 
-Console.WriteLine("Command CollectTracing: sent.");
+var sent = await socket.SendAsync(buffer);
+if (sent != buffer.Length) throw new InvalidOperationException($"Failed to send CollectTracing command. Sent only {sent} bytes.");
+
+Console.WriteLine($"Command CollectTracing: sent {sent}.");
 
 var (error, sessionId) = await ReadCollectTracingResponse(socket.ReceiveAsync);
 if (error.HasValue) throw new InvalidOperationException($"Failed to get collect tracing response: {error}");
@@ -50,47 +54,49 @@ while (true)
     var nettrace = new byte[4096];
     var read = await socket.ReceiveAsync(nettrace);
     Console.WriteLine($"Receive {read} bytes");
+    Console.WriteLine(Encoding.UTF8.GetString(nettrace.AsSpan(..read)));
 }
 
-static async Task<bool> TryCollectTracingCommand(Func<ArraySegment<byte>, Task<int>> send,
-    IReadOnlyCollection<Provider> providers)
+static ReadOnlyMemory<byte>? TryCollectTracingCommand(IReadOnlyCollection<Provider> providers)
 {
     static int? WriteProvider(Span<byte> buffer, Provider provider)
     {
         var cursor = 0;
-        BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(ulong))], provider.Keywords);
-        BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(ulong))], provider.LogLevel);
-        var providerName = Encoding.ASCII.GetBytes(provider.Name).AsSpan();
+        BinaryPrimitives.TryWriteUInt64LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(ulong))], provider.Keywords);
+        BinaryPrimitives.TryWriteUInt32LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], provider.LogLevel);
+        var providerName = Encoding.Unicode.GetBytes($"{provider.Name}\0").AsSpan();
+        BinaryPrimitives.TryWriteUInt32LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], (uint)provider.Name.Length + 1);
         providerName.CopyTo(buffer[cursor..MoveBy(ref cursor, providerName.Length)]);
-        // skip filter data for now.
         return cursor;
     }
 
-    var buffer = new byte[1024];
+    Memory<byte> data = new byte[1024];
+    var buffer = data.Span;
 
     var magic = "DOTNET_IPC_V1"u8.ToArray();
-    magic.CopyTo(buffer.AsSpan());
+    magic.CopyTo(buffer);
 
     byte eventPipeCommandSet = 0x02;
     byte collectTracingCommandId = 0x02;
-    int eventPipeCommandSetIndex = 17;
-    int collectTracingCommandIdIndex = 18;
+    int eventPipeCommandSetIndex = 16;
+    int collectTracingCommandIdIndex = 17;
+    
     buffer[eventPipeCommandSetIndex] = eventPipeCommandSet;
     buffer[collectTracingCommandIdIndex] = collectTracingCommandId;
 
     var cursor = 20;
 
     uint circularBufferMb = 1024;
-    if (!BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], circularBufferMb))
-        return false;
+    if (!BinaryPrimitives.TryWriteUInt32LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], circularBufferMb))
+        return null;
 
     uint format = 1; // NETTRACE
-    if (!BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], format))
-        return false;
+    if (!BinaryPrimitives.TryWriteUInt32LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], format))
+        return null;
 
-    uint providersCount = (uint)providers.Count;
-    if (!BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], providersCount))
-        return false;
+    var providersCount = (uint)providers.Count;
+    if (!BinaryPrimitives.TryWriteUInt32LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], providersCount))
+        return null;
 
     foreach (var provider in providers)
     {
@@ -98,16 +104,14 @@ static async Task<bool> TryCollectTracingCommand(Func<ArraySegment<byte>, Task<i
         if (providerLength.HasValue)
             MoveBy(ref cursor, providerLength.Value);
         else
-            return false;
+            return null;
     }
 
-    var sizeIndex = 15;
+    var sizeIndex = 14;
+    if (!BinaryPrimitives.TryWriteUInt16LittleEndian(buffer[sizeIndex..WithOffset(sizeIndex, 2)], (ushort)cursor))
+        return null;
 
-    if (!BitConverter.TryWriteBytes(buffer[sizeIndex..WithOffset(sizeIndex, sizeof(ushort))], (ushort)cursor))
-        return false;
-
-    var sent = await send(buffer[..cursor]).ConfigureAwait(false);
-    return sent == cursor;
+    return data;
 }
 
 static async Task<(IpcError? Error, ulong)> ReadCollectTracingResponse(Func<ArraySegment<byte>, Task<int>> receive)
@@ -130,7 +134,7 @@ static int MoveBy(ref int cursor, int value)
 
 static int WithOffset(int cursor, int offset) => cursor + offset;
 
-record Provider(string Name, ulong Keywords, ulong LogLevel, string FilterData);
+record Provider(string Name, ulong Keywords, uint LogLevel, string FilterData);
 
 enum IpcError : uint
 {
