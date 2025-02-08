@@ -2,6 +2,7 @@
 using System.Net.Sockets;
 using System.Text;
 using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
 
 const int HEADER_SIZE = 20;
 
@@ -34,7 +35,7 @@ Console.WriteLine($"Connected? {socket.Connected}");
 
 IReadOnlyCollection<Provider> providers =
 [
-    new("ProfileMe", 0, 0, string.Empty),
+    new("ProfileMe", ulong.MaxValue, 0, string.Empty),
 ];
 
 var buffer = TryCollectTracingCommand(providers)
@@ -45,8 +46,11 @@ if (sent != buffer.Length) throw new InvalidOperationException($"Failed to send 
 
 Console.WriteLine($"Command CollectTracing: sent {sent}.");
 
-var (error, sessionId) = await ReadCollectTracingResponse(socket.ReceiveAsync);
-if (error.HasValue) throw new InvalidOperationException($"Failed to get collect tracing response: {error}");
+var responseMemory = new byte[HEADER_SIZE + sizeof(ulong)]; 
+var responseLength = await socket.ReceiveAsync(responseMemory);
+Console.WriteLine($"Read {responseLength} data.");
+var maybeError = TryReadCollectTracingResponse(responseMemory.AsSpan(0, responseLength), out var sessionId);
+if (maybeError.HasValue) throw new InvalidOperationException($"Failed to get collect tracing response: {maybeError}");
 Console.WriteLine($"Session Id: {sessionId}");
 
 while (true)
@@ -114,16 +118,20 @@ static ReadOnlyMemory<byte>? TryCollectTracingCommand(IReadOnlyCollection<Provid
     return data;
 }
 
-static async Task<(IpcError? Error, ulong)> ReadCollectTracingResponse(Func<ArraySegment<byte>, Task<int>> receive)
+static IpcError? TryReadCollectTracingResponse(ReadOnlySpan<byte> data, out ulong? sessionId)
 {
-    var buffer = new byte[HEADER_SIZE + sizeof(ulong)];
-    int bytesRead = await receive(buffer).ConfigureAwait(false);
-    return bytesRead switch
+    switch (data.Length)
     {
-        var success when success == buffer.Length => (null, BitConverter.ToUInt64(buffer.AsSpan(HEADER_SIZE, sizeof(ulong)))),
-        HEADER_SIZE + sizeof(uint) => ((IpcError)BitConverter.ToUInt32(buffer.AsSpan(HEADER_SIZE, sizeof(uint))), 0),
-        var unknown => (IpcError.UnknownError, uint.MaxValue),
-    };
+        case HEADER_SIZE + sizeof(uint):
+            sessionId = uint.MaxValue;
+            return (IpcError)BitConverter.ToUInt32(data[HEADER_SIZE..WithOffset(HEADER_SIZE, sizeof(uint))]);
+        case HEADER_SIZE + sizeof(ulong):
+            sessionId = BitConverter.ToUInt64(data[HEADER_SIZE..WithOffset(HEADER_SIZE, sizeof(ulong))]);
+            return null;
+        default:
+            sessionId = uint.MaxValue;
+            return IpcError.UnknownError;
+    }
 }
 
 static int MoveBy(ref int cursor, int value)
