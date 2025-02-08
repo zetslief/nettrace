@@ -41,9 +41,16 @@ if (!sent) throw new InvalidOperationException("Failed to send CollectTracing co
 
 Console.WriteLine("Command CollectTracing: sent.");
 
-var maybeSessionId = await ReadCollectTracingResponse(socket.ReceiveAsync);
-if (!maybeSessionId.HasValue) throw new InvalidOperationException("Failed to get collect tracing response.");
-Console.WriteLine($"Session Id: {maybeSessionId.Value}");
+var (error, sessionId) = await ReadCollectTracingResponse(socket.ReceiveAsync);
+if (error.HasValue) throw new InvalidOperationException($"Failed to get collect tracing response: {error}");
+Console.WriteLine($"Session Id: {sessionId}");
+
+while (true)
+{
+    var nettrace = new byte[4096];
+    var read = await socket.ReceiveAsync(nettrace);
+    Console.WriteLine($"Receive {read} bytes");
+}
 
 static async Task<bool> TryCollectTracingCommand(Func<ArraySegment<byte>, Task<int>> send,
     IReadOnlyCollection<Provider> providers)
@@ -77,23 +84,17 @@ static async Task<bool> TryCollectTracingCommand(Func<ArraySegment<byte>, Task<i
     if (!BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], circularBufferMb))
         return false;
     
-    Console.WriteLine(cursor);
-
     uint format = 1; // NETTRACE
     if (!BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], format))
         return false;
-    Console.WriteLine(cursor);
 
     uint providersCount = (uint)providers.Count;
     if (!BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], providersCount))
         return false;
-    Console.WriteLine(cursor);
 
     foreach (var provider in providers)
     {
         var providerLength = WriteProvider(buffer[cursor..], provider);
-        Console.WriteLine(cursor);
-        Console.WriteLine(providerLength);
         if (providerLength.HasValue)
             MoveBy(ref cursor, providerLength.Value);
         else
@@ -102,29 +103,27 @@ static async Task<bool> TryCollectTracingCommand(Func<ArraySegment<byte>, Task<i
 
     var sizeIndex = 15;
 
-    Console.WriteLine(cursor);
     if (!BitConverter.TryWriteBytes(buffer[sizeIndex..WithOffset(sizeIndex, sizeof(ushort))], (ushort)cursor))
         return false;
-    Console.WriteLine(cursor);
 
     var sent = await send(buffer[..cursor]).ConfigureAwait(false);
-    Console.WriteLine(sent);
     return sent == cursor;
 }
 
-static async Task<uint?> ReadCollectTracingResponse(Func<ArraySegment<byte>, Task<int>> receive)
+static async Task<(IpcError? Error, ulong)> ReadCollectTracingResponse(Func<ArraySegment<byte>, Task<int>> receive)
 {
     var buffer = new byte[HEADER_SIZE + sizeof(ulong)];
     int bytesRead = await receive(buffer).ConfigureAwait(false);
     Console.WriteLine(bytesRead);
-    Console.WriteLine(sizeof(ulong));
-    Console.WriteLine(buffer.Length);
-    /*
-    For some reason only 24 bytes are received from the socket.
     if (bytesRead < buffer.Length)
-        return null;
-    */
-    return BitConverter.ToUInt32(buffer.AsSpan(HEADER_SIZE, sizeof(uint)));
+    {
+        if (bytesRead == (HEADER_SIZE + sizeof(uint)))
+        {
+            return ((IpcError)BitConverter.ToUInt32(buffer.AsSpan(HEADER_SIZE, sizeof(uint))), 0);
+        }
+        return (IpcError.UnknownError, 0);
+    }
+    return (null, BitConverter.ToUInt64(buffer.AsSpan(HEADER_SIZE, sizeof(ulong))));
 }
 
 static int MoveBy(ref int cursor, int value)
@@ -136,3 +135,11 @@ static int MoveBy(ref int cursor, int value)
 static int WithOffset(int cursor, int offset) => cursor + offset;
 
 record Provider(string Name, ulong Keywords, ulong LogLevel, string FilterData);
+
+enum IpcError : uint
+{
+    BadEncoding = 2148733828,
+    UnknownCommand = 2148733829,
+    UnknownMagic = 2148733830,
+    UnknownError   = 2148733831,
+}
