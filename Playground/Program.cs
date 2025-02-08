@@ -1,8 +1,8 @@
 ﻿using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
-using System.Runtime.InteropServices;
-using System.Threading;
+
+const int HEADER_SIZE = 20;
 
 var process = Process.GetProcessesByName("profileMe").Single();
 
@@ -18,9 +18,8 @@ Console.WriteLine($"Directory: {directory}");
 /*
 In order to ensure filename uniqueness, a disambiguation key is generated.
 On Mac and NetBSD, this is the process start time encoded as the number of seconds since UNIX epoch time.
-If /proc/$PID/stat is available (all other *nix platforms), then the process start time encoded as jiffies since boot time is used. 
+If /proc/$PID/stat is available (all other *nix platforms), then the process start time encoded as jiffies since boot time is used.
  */
-
 var file = Directory.GetFiles(directory, $"dotnet-diagnostic-{process.Id}-*").Single();
 Console.WriteLine($"File: {file}");
 
@@ -32,66 +31,108 @@ await socket.ConnectAsync(endpoint, cts.Token);
 
 Console.WriteLine($"Connected? {socket.Connected}");
 
-byte[] bytes = new byte[1000];
-var len = SetupCollectTracingCommand(bytes, [new("ProfileMe", 0, 0, string.Empty)]);
+IReadOnlyCollection<Provider> providers =
+[
+    new("ProfileMe", 0, 0, string.Empty),
+];
 
-var written = await socket.SendAsync(bytes[..len]);
-Console.WriteLine($"Wrote {written} bytes.");
+bool sent = await TryCollectTracingCommand(socket.SendAsync, providers);
+if (!sent) throw new InvalidOperationException("Failed to send CollectTracing command.");
 
-byte[] response = new byte[20 + 8];
-var read = await socket.ReceiveAsync(response);
+Console.WriteLine("Command CollectTracing: sent.");
 
-Console.WriteLine($"Read {read} bytes.");
-Console.WriteLine($"Session Id: {ReadSessionId(bytes)}");
+var maybeSessionId = await ReadCollectTracingResponse(socket.ReceiveAsync);
+if (!maybeSessionId.HasValue) throw new InvalidOperationException("Failed to get collect tracing response.");
+Console.WriteLine($"Session Id: {maybeSessionId.Value}");
 
-static int SetupCollectTracingCommand(Span<byte> buffer, IReadOnlyCollection<Provider> providers)
+static async Task<bool> TryCollectTracingCommand(Func<ArraySegment<byte>, Task<int>> send,
+    IReadOnlyCollection<Provider> providers)
 {
-    static int SetupProvider(Span<byte> buffer, Provider provider)
+    static int? WriteProvider(Span<byte> buffer, Provider provider)
     {
-        BitConverter.TryWriteBytes(buffer[0..sizeof(ulong)], provider.Keywords);
-        var cursor = sizeof(ulong);
-        BitConverter.TryWriteBytes(buffer[cursor..(cursor + sizeof(ulong))], provider.LogLevel);
-        cursor += sizeof(ulong);
+        var cursor = 0;
+        BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(ulong))], provider.Keywords);
+        BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(ulong))], provider.LogLevel);
         var providerName = Encoding.ASCII.GetBytes(provider.Name).AsSpan();
-        providerName.CopyTo(buffer[cursor..]);
-        cursor += providerName.Length;
+        providerName.CopyTo(buffer[cursor..MoveBy(ref cursor, providerName.Length)]);
         // skip filter data for now.
         return cursor;
     }
-    
-    var magic = Encoding.ASCII.GetBytes("DOTNET_IPC_V1").AsSpan();
-    magic.CopyTo(buffer);
-    var size = 20;
+
+    var buffer = new byte[1024];
+
+    var magic = "DOTNET_IPC_V1"u8.ToArray();
+    magic.CopyTo(buffer.AsSpan());
+
     byte eventPipeCommandSet = 0x02;
     byte collectTracingCommandId = 0x02;
     int eventPipeCommandSetIndex = 17;
     int collectTracingCommandIdIndex = 18;
     buffer[eventPipeCommandSetIndex] = eventPipeCommandSet;
     buffer[collectTracingCommandIdIndex] = collectTracingCommandId;
-    
+
+    var cursor = 20;
+
     uint circularBufferMb = 1024;
-    BitConverter.TryWriteBytes(buffer[size..(size + sizeof(uint))], circularBufferMb);
-    size += sizeof(uint);
+    if (!BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], circularBufferMb))
+        return false;
     
-    uint format = 1;
-    BitConverter.TryWriteBytes(buffer[size..(size + sizeof(uint))], format);
-    size += sizeof(uint);
-    
+    Console.WriteLine(cursor);
+
+    uint format = 1; // NETTRACE
+    if (!BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], format))
+        return false;
+    Console.WriteLine(cursor);
+
     uint providersCount = (uint)providers.Count;
-    BitConverter.TryWriteBytes(buffer[size..(size + sizeof(uint))], providersCount);
-    size += sizeof(uint);
-    
+    if (!BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], providersCount))
+        return false;
+    Console.WriteLine(cursor);
+
     foreach (var provider in providers)
-        size += SetupProvider(buffer[size..], provider);
+    {
+        var providerLength = WriteProvider(buffer[cursor..], provider);
+        Console.WriteLine(cursor);
+        Console.WriteLine(providerLength);
+        if (providerLength.HasValue)
+            MoveBy(ref cursor, providerLength.Value);
+        else
+            return false;
+    }
+
     var sizeIndex = 15;
-    
-    BitConverter.TryWriteBytes(buffer[sizeIndex..(sizeIndex + sizeof(ushort))], size);
-    return size;
+
+    Console.WriteLine(cursor);
+    if (!BitConverter.TryWriteBytes(buffer[sizeIndex..WithOffset(sizeIndex, sizeof(ushort))], (ushort)cursor))
+        return false;
+    Console.WriteLine(cursor);
+
+    var sent = await send(buffer[..cursor]).ConfigureAwait(false);
+    Console.WriteLine(sent);
+    return sent == cursor;
 }
 
-static ulong ReadSessionId(ReadOnlySpan<byte> response)
+static async Task<uint?> ReadCollectTracingResponse(Func<ArraySegment<byte>, Task<int>> receive)
 {
-    return BitConverter.ToUInt64(response[20..]);
+    var buffer = new byte[HEADER_SIZE + sizeof(ulong)];
+    int bytesRead = await receive(buffer).ConfigureAwait(false);
+    Console.WriteLine(bytesRead);
+    Console.WriteLine(sizeof(ulong));
+    Console.WriteLine(buffer.Length);
+    /*
+    For some reason only 24 bytes are received from the socket.
+    if (bytesRead < buffer.Length)
+        return null;
+    */
+    return BitConverter.ToUInt32(buffer.AsSpan(HEADER_SIZE, sizeof(uint)));
 }
+
+static int MoveBy(ref int cursor, int value)
+{
+    cursor += value;
+    return cursor;
+}
+
+static int WithOffset(int cursor, int offset) => cursor + offset;
 
 record Provider(string Name, ulong Keywords, ulong LogLevel, string FilterData);
