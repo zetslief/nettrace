@@ -44,7 +44,7 @@ public sealed class NettraceReaderTest
 
     private static void UsingEventPipe(Action<TraceEvent>? onEvent = null, Action<TraceEvent>? onUnhandledEvent = null)
     {
-        static void Ignore(TraceEvent @event) {}
+        static void Ignore(TraceEvent @event) { }
 
         using var eventSource = new EventPipeEventSource(filePath);
         eventSource.AllEvents += onEvent ?? Ignore;

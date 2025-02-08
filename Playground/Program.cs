@@ -83,7 +83,7 @@ static async Task<bool> TryCollectTracingCommand(Func<ArraySegment<byte>, Task<i
     uint circularBufferMb = 1024;
     if (!BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], circularBufferMb))
         return false;
-    
+
     uint format = 1; // NETTRACE
     if (!BitConverter.TryWriteBytes(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], format))
         return false;
@@ -114,16 +114,12 @@ static async Task<(IpcError? Error, ulong)> ReadCollectTracingResponse(Func<Arra
 {
     var buffer = new byte[HEADER_SIZE + sizeof(ulong)];
     int bytesRead = await receive(buffer).ConfigureAwait(false);
-    Console.WriteLine(bytesRead);
-    if (bytesRead < buffer.Length)
+    return bytesRead switch
     {
-        if (bytesRead == (HEADER_SIZE + sizeof(uint)))
-        {
-            return ((IpcError)BitConverter.ToUInt32(buffer.AsSpan(HEADER_SIZE, sizeof(uint))), 0);
-        }
-        return (IpcError.UnknownError, 0);
-    }
-    return (null, BitConverter.ToUInt64(buffer.AsSpan(HEADER_SIZE, sizeof(ulong))));
+        var success when success == buffer.Length => (null, BitConverter.ToUInt64(buffer.AsSpan(HEADER_SIZE, sizeof(ulong)))),
+        HEADER_SIZE + sizeof(uint) => ((IpcError)BitConverter.ToUInt32(buffer.AsSpan(HEADER_SIZE, sizeof(uint))), 0),
+        var unknown => (IpcError.UnknownError, uint.MaxValue),
+    };
 }
 
 static int MoveBy(ref int cursor, int value)
@@ -141,5 +137,5 @@ enum IpcError : uint
     BadEncoding = 2148733828,
     UnknownCommand = 2148733829,
     UnknownMagic = 2148733830,
-    UnknownError   = 2148733831,
+    UnknownError = 2148733831,
 }

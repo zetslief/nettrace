@@ -39,10 +39,10 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
         canvas.Clear(SKColors.Black);
 
         var stopwatch = Stopwatch.StartNew();
-        
+
         foreach (var (camera, node) in items)
             Render(camera, canvas, node);
-        
+
         Console.WriteLine($"Render: {stopwatch.Elapsed.TotalMilliseconds} ms");
 
         canvas.Restore();
@@ -60,7 +60,7 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
                 && IsPointInView(camera, new(rect.Right, rect.Top))
                 && IsPointInView(camera, new(rect.Left, rect.Bottom))
                 && IsPointInView(camera, new(rect.Right, rect.Bottom));
-            
+
         switch (item)
         {
             case Rectangle rectangle:
@@ -83,7 +83,7 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
     private static void RenderPoint(Camera2D camera, SKCanvas canvas, Point point)
     {
         var position = camera.ToViewPosition(point.Position);
-        
+
         canvas.DrawLine(
             position.X, position.Y - 15, position.X, position.Y,
             new() { Style = SKPaintStyle.Stroke, StrokeWidth = 1, Color = point.Color.Dimmer() });
@@ -95,21 +95,21 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
         var (toX, toY) = camera.ToViewPosition(new(item.Rect.Right, item.Rect.Bottom));
 
         SKRect rect = new(fromX, fromY, toX, toY);
-        
+
         canvas.DrawRect(rect, new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() });
-        canvas.DrawRect(rect, new() { Style = SKPaintStyle.Stroke, StrokeWidth = 2, Color = item.Color.Dimmer()});
-        
+        canvas.DrawRect(rect, new() { Style = SKPaintStyle.Stroke, StrokeWidth = 2, Color = item.Color.Dimmer() });
+
         canvas.DrawCircle(
             fromX, fromY, 2,
-            new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() } );
+            new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() });
         canvas.DrawCircle(
             toX, fromY, 2,
-            new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() } );
+            new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() });
     }
-    
+
     private static IEnumerable<Node> TranslateUiNode(Camera2D camera, IEnumerable<Node> nodes)
         => nodes.Select(node => TranslateUiNode(camera, node));
-    
+
     private static Node TranslateUiNode(Camera2D camera, Node node) => node switch
     {
         Point point => new Point(camera.FromViewPosition(point.Position), point.Color),
@@ -124,17 +124,17 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
 public sealed class Camera2D(Position position, Rect data, Rect view)
 {
     private readonly Rect view = view;
-    
+
     public Position Position { get; } = position;
     public float Width { get; } = data.Width;
     public float Height { get; } = data.Height;
-    
+
     public Position ToViewPosition(Position position)
         => new((position.X - data.Left) / Width * view.Width, (position.Y - data.Top) / Height * view.Height);
-    
+
     public Position FromViewPosition(Position position)
         => new(position.X / view.Width * data.Width + data.Left, position.Y / view.Height * data.Height + data.Top);
-    
+
     public bool IsInView(Position position)
     {
         var (x, y) = ToViewPosition(position);
@@ -151,10 +151,10 @@ public readonly record struct Rect(float Left, float Top, float Right, float Bot
 {
     public float Width => Right - Left;
     public float Height => Bottom - Top;
-    
+
     public static Rect FromPositions(Position leftTop, Position rightBottom)
         => new(leftTop.X, leftTop.Y, rightBottom.X, rightBottom.Y);
-    
+
     public override string ToString()
         => $"Rect({Left}, {Top}, {Right}, {Bottom}) | Width {Width} | Height {Height}";
 }
@@ -163,16 +163,16 @@ public static class Converters
 {
     public static Rect Into(this Avalonia.Rect rect)
         => new((float)rect.Left, (float)rect.Top, (float)rect.Right, (float)rect.Bottom);
-    
+
     public static Position FromSkia(this SKPoint point)
         => new(point.X, point.Y);
-    
+
     public static Position Into(this Avalonia.Point point)
         => new((float)point.X, (float)point.Y);
-    
+
     public static SKColor Into(this Avalonia.Media.Color color)
         => new(color.R, color.G, color.B, color.A);
-    
+
     public static SKColor Dimmer(this Avalonia.Media.Color color)
         => new(
             (byte)Math.Max(color.R - 50, 0),

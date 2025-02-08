@@ -115,7 +115,7 @@ public sealed class TimespanControl : Control
             owner.viewport = owner.dataBounds;
             Console.WriteLine($"Viewport is measured: {owner.viewport}");
         }
-        
+
         Dispatcher.UIThread.InvokeAsync(owner.InvalidateVisual, DispatcherPriority.Input);
     }
 

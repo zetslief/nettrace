@@ -166,7 +166,7 @@ public static class NettraceReader
                     stack = StackBlockDecoder(stream);
                     break;
                 case "EventBlock":
-                    var eventBlockDecoder = BlockDecoder(EventDecoder); 
+                    var eventBlockDecoder = BlockDecoder(EventDecoder);
                     var @event = eventBlockDecoder(stream);
                     eventBlocks.Add(@event);
                     break;
@@ -195,7 +195,7 @@ public static class NettraceReader
             type = null;
             return false;
         }
-        
+
         var tag = ReadTag(stream);
         if (tag == Tag.BeginPrivateObject)
         {
@@ -213,7 +213,7 @@ public static class NettraceReader
     private static void FinishObject(Stream stream)
     {
         var _endObject = ReadTag(stream);
-    } 
+    }
 
     private static Object<T> ReadObject<T>(Stream stream, Func<Stream, T> payloadDecoder)
     {

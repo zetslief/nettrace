@@ -106,7 +106,7 @@ public class MainWindowViewModel : ReactiveObject
         get => selectedMetadataBlock;
         set => this.RaiseAndSetIfChanged(ref selectedMetadataBlock, value);
     }
-    
+
     public IReadOnlyCollection<EventBlockViewModel>? EventBlocks
     {
         get => this.eventBlocks;
@@ -146,7 +146,7 @@ public class MainWindowViewModel : ReactiveObject
             return;
         }
 
-        using var stream =  File.Open(path, FileMode.Open);
+        using var stream = File.Open(path, FileMode.Open);
         var nettrace = NettraceReader.Read(stream);
         trace = nettrace.Trace;
         allEventBlobs = nettrace.EventBlocks
@@ -219,7 +219,7 @@ public class MainWindowViewModel : ReactiveObject
             output.Add(new Point(new(ToSeconds(currentTime), 2.1f), Avalonia.Media.Colors.Green));
         }
     }
-    
+
     private static float ToSeconds(DateTime dateTime)
         => (float)((dateTime - dateTime.Date).Ticks / 10_000_000d);
 }
