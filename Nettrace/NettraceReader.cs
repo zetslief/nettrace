@@ -1,6 +1,7 @@
 using System.Text;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Nettrace;
 
@@ -179,40 +180,42 @@ public static class NettraceReader
             sequencePointBlock ?? throw new InvalidOperationException("File dosn't contain SPB."));
     }
 
-    public static (Type, Trace) ReadTrace(Stream stream)
+    public static bool TryStartObject(ReadOnlySpan<byte> stream, [NotNullWhen(true)] out (int, Type)? result)
     {
-        TryStartObject(stream, out var t);
-        return (t!, TraceDecoder(stream));
-    }
-
-    private static bool TryStartObject(Stream stream, out Type? type)
-    {
-        if (stream.Position == stream.Length)
+        if (stream.Length < sizeof(byte))
         {
-            type = null;
+            result = null;
             return false;
         }
+        
+        int cursor = 0;
 
-        var tag = ReadTag(stream);
+        var tag = ReadTag(stream[MoveBy(ref cursor, sizeof(byte))]);
         if (tag == Tag.BeginPrivateObject)
         {
-            type = ReadType(stream);
+            if (!TryReadType(stream, ref cursor, out var maybeType))
+            {
+                result = null;
+                return false;
+            }
+
+            result = (cursor, maybeType);
             return true;
         }
         else
         {
             Debug.Assert(tag == Tag.NullReference);
-            type = null;
+            result = null;
             return false;
         }
     }
 
-    private static void FinishObject(Stream stream)
+    private static void FinishObject(ReadOnlySpan<byte> stream, ref int cursor)
     {
-        var _endObject = ReadTag(stream);
+        var _endObject = ReadTag(stream[MoveBy(ref cursor, sizeof(byte))]);
     }
 
-    private static Object<T> ReadObject<T>(Stream stream, Func<Stream, T> payloadDecoder)
+    private static bool TryReadObject<T>(ReadOnlySpan<byte> stream, ref int cursor, Func<Stream, T> payloadDecoder, out (int, Object<T>)? result)
     {
         var beginPrivateObject = ReadTag(stream);
 
@@ -225,18 +228,32 @@ public static class NettraceReader
         return new(type, payload);
     }
 
-    private static Type ReadType(Stream stream)
+    private static bool TryReadType(ReadOnlySpan<byte> data, ref int cursor, [NotNullWhen(true)] out Type? type)
     {
-        var beginPrivateObject = ReadTag(stream);
+        if (data.Length < cursor + 11)
+        {
+            type = null;
+            return false;
+        }
 
-        var tag = ReadTag(stream);
-        var version = ReadInt32(stream);
-        var minimumReaderVersion = ReadInt32(stream);
-        var name = ReadString(stream);
+        var beginPrivateObject = ReadTag(data[MoveBy(ref cursor, sizeof(byte))]);
 
-        var endObject = ReadTag(stream);
+        var tag = ReadTag(data[MoveBy(ref cursor, sizeof(byte))]);
+        var version = ReadInt32(data[cursor..MoveBy(ref cursor, sizeof(int))]);
+        var minimumReaderVersion = ReadInt32(data[cursor..MoveBy(ref cursor, sizeof(int))]);
+        if (!TryReadString(data[cursor..], out var maybeName))
+        {
+            type = null;
+            return false;
+        }
+        
+        var (nameByteLength, name) = maybeName.Value;
+        MoveBy(ref cursor, nameByteLength);
 
-        return new(tag, name, version, minimumReaderVersion);
+        var endObject = ReadTag(data[MoveBy(ref cursor, sizeof(byte))]);
+
+        type = new(tag, name, version, minimumReaderVersion);
+        return true;
     }
 
     private static Trace TraceDecoder(Stream stream)
@@ -472,14 +489,25 @@ public static class NettraceReader
         stream.Seek(padding, SeekOrigin.Current);
     }
 
-    private static Tag ReadTag(Stream stream) => (Tag)ReadByte(stream);
+    private static Tag ReadTag(byte data) => (Tag)data;
 
-    public static string ReadString(Stream stream)
+    public static bool TryReadString(ReadOnlySpan<byte> data, [NotNullWhen(true)] out (int, string)? result)
     {
-        var length = ReadInt32(stream);
-        Span<byte> content = new byte[length];
-        stream.ReadExactly(content);
-        return Encoding.UTF8.GetString(content);
+        if (data.Length < sizeof(int))
+        {
+            result = null;
+            return false;
+        }
+
+        var length = ReadInt32(data);
+        if (length > data.Length)
+        {
+            result = null;
+            return false;
+        }
+
+        result = (length, Encoding.UTF8.GetString(data[..length]));
+        return true;
     }
 
     private static byte ReadByte(Stream stream)
@@ -496,12 +524,8 @@ public static class NettraceReader
         return MemoryMarshal.Read<short>(lengthBytes);
     }
 
-    private static int ReadInt32(Stream stream)
-    {
-        Span<byte> lengthBytes = stackalloc byte[4];
-        stream.ReadExactly(lengthBytes);
-        return MemoryMarshal.Read<int>(lengthBytes);
-    }
+    private static int ReadInt32(ReadOnlySpan<byte> data)
+        => MemoryMarshal.Read<int>(data[..4]);
 
     private static long ReadInt64(Stream stream)
     {

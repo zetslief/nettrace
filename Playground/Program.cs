@@ -53,7 +53,8 @@ var maybeError = TryReadCollectTracingResponse(responseMemory.AsSpan(0, response
 if (maybeError.HasValue) throw new InvalidOperationException($"Failed to get collect tracing response: {maybeError}");
 Console.WriteLine($"Session Id: {sessionId}");
 
-bool readTrace = true; 
+var state = State.ReadingNewObject;
+NettraceReader.Type? currentObject = null; 
 
 while (true)
 {
@@ -63,14 +64,10 @@ while (true)
     Console.WriteLine(Encoding.UTF8.GetString(nettrace.AsSpan(..read)));
 
     using var stream = new MemoryStream(nettrace[8..read]);
-    if (readTrace)
+    switch (state)
     {
-        var streamHeader = NettraceReader.ReadString(stream);
-        var (type, trace) = NettraceReader.ReadTrace(stream);
-        Console.WriteLine(streamHeader);
-        Console.WriteLine(type);
-        Console.WriteLine(trace);
-        readTrace = false;
+        default:
+            throw new NotImplementedException($"{state} is not implemented");
     }
 }
 
@@ -164,3 +161,9 @@ enum IpcError : uint
     UnknownMagic = 2148733830,
     UnknownError = 2148733831,
 }
+
+enum State
+{
+    ReadingNewObject,
+    PayloadParsing,
+} 
