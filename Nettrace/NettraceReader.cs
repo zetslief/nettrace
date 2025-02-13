@@ -117,6 +117,7 @@ public static class NettraceReader
         }
     }
     public record Object<T>(Type Type, T Payload);
+    public delegate bool ObjectDecoder<T>(ReadOnlySpan<byte> data, [NotNullWhen(true)] out (int, T) result);
     public record NettraceFile(
         string Magic,
         Trace Trace,
@@ -215,17 +216,31 @@ public static class NettraceReader
         var _endObject = ReadTag(stream[MoveBy(ref cursor, sizeof(byte))]);
     }
 
-    private static bool TryReadObject<T>(ReadOnlySpan<byte> stream, ref int cursor, Func<Stream, T> payloadDecoder, out (int, Object<T>)? result)
+    private static bool TryReadObject<T>(ReadOnlySpan<byte> stream, ObjectDecoder<T> payloadDecoder, [NotNullWhen(true)] out (int, Object<T>)? result)
     {
-        var beginPrivateObject = ReadTag(stream);
+        int cursor = 0;
+        
+        var beginPrivateObject = ReadTag(stream[MoveBy(ref cursor, sizeof(byte))]);
 
-        Type type = ReadType(stream);
+        if (!TryReadType(stream, ref cursor, out var maybeType))
+        {
+            result = null;
+            return false;
+        }
 
-        var payload = payloadDecoder(stream);
+        if (!payloadDecoder(stream[cursor..], out var maybePayload))
+        {
+            result = null;
+            return false;
+        }
+        
+        var (payloadByteLength, payload) = maybePayload;
+        MoveBy(ref cursor, payloadByteLength);
 
-        var endObject = ReadTag(stream);
+        var endObject = ReadTag(stream[MoveBy(ref cursor, sizeof(byte))]);
 
-        return new(type, payload);
+        result = (cursor, new(maybeType, payload));
+        return false;
     }
 
     private static bool TryReadType(ReadOnlySpan<byte> data, ref int cursor, [NotNullWhen(true)] out Type? type)
