@@ -271,23 +271,32 @@ public static class NettraceReader
         return true;
     }
 
-    private static Trace TraceDecoder(Stream stream)
+    private static bool TryDecodeTrace(ReadOnlySpan<byte> stream, [NotNullWhen(true)] out (int, Trace)? result)
     {
-        var year = ReadInt16(stream);
-        var month = ReadInt16(stream);
-        var dayOfWeek = ReadInt16(stream);
-        var day = ReadInt16(stream);
-        var hour = ReadInt16(stream);
-        var minute = ReadInt16(stream);
-        var second = ReadInt16(stream);
-        var millisecond = ReadInt16(stream);
-        var syncTimeQpc = ReadInt64(stream);
-        var qpcFrequency = ReadInt64(stream);
-        var pointerSize = ReadInt32(stream);
-        var processId = ReadInt32(stream);
-        var numberOfProcessors = ReadInt32(stream);
-        var expectedCpuSamplingRate = ReadInt32(stream);
-        return new(
+        if (stream.Length < 48)
+        {
+            result = null;
+            return false;
+        }
+
+        int cursor = 0;
+        
+        var year = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var month = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var dayOfWeek = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var day = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var hour = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var minute = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var second = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var millisecond = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var syncTimeQpc = ReadInt64(stream[cursor..MoveBy(ref cursor, sizeof(long))]);
+        var qpcFrequency = ReadInt64(stream[cursor..MoveBy(ref cursor, sizeof(long))]);
+        var pointerSize = ReadInt32(stream[cursor..MoveBy(ref cursor, sizeof(int))]);
+        var processId = ReadInt32(stream[cursor..MoveBy(ref cursor, sizeof(int))]);
+        var numberOfProcessors = ReadInt32(stream[cursor..MoveBy(ref cursor, sizeof(int))]);
+        var expectedCpuSamplingRate = ReadInt32(stream[cursor..MoveBy(ref cursor, sizeof(int))]);
+        
+        result = (cursor, new(
             new(year, month, day, hour, minute, second, millisecond),
             syncTimeQpc,
             qpcFrequency,
@@ -295,7 +304,8 @@ public static class NettraceReader
             processId,
             numberOfProcessors,
             expectedCpuSamplingRate
-        );
+        ));
+        return true;
     }
 
     public delegate T PayloadDecoder<T>(in ReadOnlySpan<byte> bytes);
@@ -532,22 +542,14 @@ public static class NettraceReader
         return content[0];
     }
 
-    private static short ReadInt16(Stream stream)
-    {
-        Span<byte> lengthBytes = stackalloc byte[2];
-        stream.ReadExactly(lengthBytes);
-        return MemoryMarshal.Read<short>(lengthBytes);
-    }
+    private static short ReadInt16(ReadOnlySpan<byte> data)
+        => MemoryMarshal.Read<short>(data);
 
     private static int ReadInt32(ReadOnlySpan<byte> data)
         => MemoryMarshal.Read<int>(data[..4]);
 
-    private static long ReadInt64(Stream stream)
-    {
-        Span<byte> lengthBytes = stackalloc byte[8];
-        stream.ReadExactly(lengthBytes);
-        return MemoryMarshal.Read<long>(lengthBytes);
-    }
+    private static long ReadInt64(ReadOnlySpan<byte> data)
+        => MemoryMarshal.Read<long>(lengthBytes);
 
     private static void PrintBytes(ReadOnlySpan<byte> bytes)
     {
