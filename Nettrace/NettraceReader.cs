@@ -488,14 +488,10 @@ public static class NettraceReader
         return new(blockSize, firstId, count, stacks);
     }
 
-    private static SequencePointBlock SequencePointBlockDecoder(Stream stream)
+    private static SequencePointBlock ReadSequencePointBlockDecoder(RawBlock block)
     {
-        var blockSize = ReadInt32(stream);
-
-        Align(stream);
-
-        Span<byte> blockBytes = new byte[blockSize];
-        stream.ReadExactly(blockBytes);
+        ReadOnlySpan<byte> blockBytes = block.Payload.Span;
+        
         int cursor = 0;
 
         long timeStamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
@@ -509,7 +505,7 @@ public static class NettraceReader
             threads[threadIndex] = new(threadId, sequenceNumber);
         }
 
-        return new(blockSize, timeStamp, threadCount, threads);
+        return new(blockBytes.Length, timeStamp, threadCount, threads);
     }
 
     private static string SkipPayloadDecoder(Stream stream)
