@@ -72,7 +72,8 @@ public static class NettraceReader
     }
     public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload);
     public record Event(byte[] Bytes);
-    public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs) // MetdataBlock uses the same layout as EventBlock 
+    public sealed record RawBlock(Type Type, Memory<byte> Payload);
+    public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs)
     {
         private bool PrintMembers(StringBuilder builder)
         {
@@ -310,14 +311,33 @@ public static class NettraceReader
 
     public delegate T PayloadDecoder<T>(in ReadOnlySpan<byte> bytes);
 
-    private static Func<Stream, Block<T>> BlockDecoder<T>(PayloadDecoder<T> payloadDecoder) => (stream) =>
+    private static bool TryRawReadBlock(ReadOnlySpan<byte> data, Type type, [NotNullWhen(true)] out (int, RawBlock)? result)
     {
-        var blockSize = ReadInt32(stream);
+        if (data.Length < sizeof(int))
+        {
+            result = null;
+            return false;
+        }
+        
+        int cursor = 0;
+        var blockSize = ReadInt32(data[cursor..MoveBy(ref cursor, sizeof(int))]);
 
-        Align(stream);
+        if (cursor + blockSize > data.Length)
+        {
+            result = null;
+            return false;
+        }
 
-        Span<byte> blockBytes = new byte[blockSize];
-        stream.ReadExactly(blockBytes);
+        // TODO: Align(stream);
+        Memory<byte> buffer = new byte[blockSize];
+        data[cursor..MoveBy(ref cursor, blockSize)].CopyTo(buffer.Span);
+        result = (cursor, new(type, buffer));
+        return true;
+    }
+
+    private static Block<T> BlockDecoder<T>(RawBlock rawBlock, PayloadDecoder<T> payloadDecoder)
+    {
+        ReadOnlySpan<byte> blockBytes = rawBlock.Payload.Span;
 
         int cursor = 0;
         var headerSize = MemoryMarshal.Read<short>(blockBytes[cursor..MoveBy(ref cursor, 2)]);
@@ -351,8 +371,8 @@ public static class NettraceReader
             var seventhBitIsSet = (flag & 64) != 0;
             var eighthBitIsSet = (flag & 128) != 0;
 
-            var metadataId = firstBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.MetadataId;
-            var sequenceNumber = secondBitIsSet
+            int metadataId = firstBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.MetadataId;
+            int sequenceNumber = secondBitIsSet
                 ? ReadVarInt32(blockBytes, ref cursor) + context.SequenceNumber
                 : context.SequenceNumber;
             sequenceNumber = metadataId == 0 ? sequenceNumber : sequenceNumber + 1;
@@ -375,8 +395,8 @@ public static class NettraceReader
             eventBlobs.Add(EventBlob<T>.Create(flag, payloadDecoder(in payload), in context));
         }
 
-        return new(blockSize, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), [.. eventBlobs]);
-    };
+        return new(rawBlock.Payload.Length, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), [.. eventBlobs]);
+    }
 
     private static PayloadDecoder<MetadataEvent> CreateMetadataEventDecoder(int fileVersion)
         => (in ReadOnlySpan<byte> bytes) => MetadataEventDecoder(in bytes, fileVersion);
@@ -502,7 +522,7 @@ public static class NettraceReader
         return "Empty";
     }
 
-    static int MoveBy(ref int value, int by)
+    private static int MoveBy(ref int value, int by)
     {
         value += by;
         return value;
@@ -524,14 +544,16 @@ public static class NettraceReader
             return false;
         }
 
-        var length = ReadInt32(data);
+        var cursor = 0;
+        var length = ReadInt32(data[cursor..MoveBy(ref cursor, sizeof(int))]);
         if (length > data.Length)
         {
             result = null;
             return false;
         }
-
-        result = (length, Encoding.UTF8.GetString(data[..length]));
+        
+        var @string = Encoding.UTF8.GetString(data[cursor..MoveBy(ref cursor, length)]);
+        result = (cursor, @string);
         return true;
     }
 
@@ -546,10 +568,10 @@ public static class NettraceReader
         => MemoryMarshal.Read<short>(data);
 
     private static int ReadInt32(ReadOnlySpan<byte> data)
-        => MemoryMarshal.Read<int>(data[..4]);
+        => MemoryMarshal.Read<int>(data);
 
     private static long ReadInt64(ReadOnlySpan<byte> data)
-        => MemoryMarshal.Read<long>(lengthBytes);
+        => MemoryMarshal.Read<long>(data);
 
     private static void PrintBytes(ReadOnlySpan<byte> bytes)
     {
@@ -560,7 +582,7 @@ public static class NettraceReader
         Console.WriteLine($"{bytes[^1]:D}");
     }
 
-    private static int ReadVarInt32(Span<byte> bytes, ref int cursor)
+    private static int ReadVarInt32(ReadOnlySpan<byte> bytes, ref int cursor)
     {
         int result = 0;
         var maxIndex = 5;
@@ -577,7 +599,7 @@ public static class NettraceReader
         return result;
     }
 
-    private static long ReadVarInt64(Span<byte> bytes, ref int cursor)
+    private static long ReadVarInt64(ReadOnlySpan<byte> bytes, ref int cursor)
     {
         long result = 0;
         var maxIndex = 10;
@@ -594,7 +616,7 @@ public static class NettraceReader
         return result;
     }
 
-    private static Guid ReadGuid(Span<byte> bytes, ref int cursor)
+    private static Guid ReadGuid(ReadOnlySpan<byte> bytes, ref int cursor)
         => MemoryMarshal.Read<Guid>(bytes[cursor..MoveBy(ref cursor, 16)]);
 
     private static string ReadUnicode(ReadOnlySpan<byte> bytes, ref int cursor)
