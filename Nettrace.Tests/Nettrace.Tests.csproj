@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="../perf.nettrace" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../traces/perf.nettrace" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
