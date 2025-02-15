@@ -56,15 +56,31 @@ Console.WriteLine($"Session Id: {sessionId}");
 var state = State.Magic;
 NettraceReader.Type? currentObject = null;
 
-Memory<byte> nettrace = new byte[1024 * 4];
-var read = await socket.ReceiveAsync(nettrace);
-Console.WriteLine($"Receive {read} bytes");
+Memory<byte> nettrace = new byte[1024 * 8];
 int globalCursor = 0;
-bool needMoreMemory = false;
+int bufferEnd = 0;
+bool needMoreMemory = true;
 
 while (true)
 {
-    if (needMoreMemory) throw new InvalidOperationException("Need more memory. This operation is not implemented yet.");
+    if (needMoreMemory)
+    {
+        var read = await socket.ReceiveAsync(nettrace[bufferEnd..]);
+        bufferEnd += read;
+        if (bufferEnd == nettrace.Length)
+        {
+            var newNettrace = new byte[nettrace.Length * 8];
+            nettrace.CopyTo(newNettrace);
+            nettrace = newNettrace;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"Parsing - Receive {read} bytes");
+        Console.WriteLine($"Buffer Length - {nettrace.Length} | Global Cursor - {globalCursor} | Buffer End  - {bufferEnd}");
+        Console.ResetColor();
+        needMoreMemory = false;
+    }
+
     switch (state)
     {
         case State.Magic:
@@ -74,7 +90,7 @@ while (true)
             state = State.StreamHeader;
             break;
         case State.StreamHeader:
-            if (!NettraceReader.TryReadStreamHeader(nettrace.Span[globalCursor..], out var maybeStreamHeader))
+            if (!NettraceReader.TryReadStreamHeader(nettrace.Span[globalCursor..bufferEnd], out var maybeStreamHeader))
             {
                 needMoreMemory = true;
                 break;
@@ -85,7 +101,7 @@ while (true)
             state = State.StartObject;
             break;
         case State.StartObject:
-            if (!NettraceReader.TryStartObject(nettrace.Span[globalCursor..], out var maybeNewObject))
+            if (!NettraceReader.TryStartObject(nettrace.Span[globalCursor..bufferEnd], out var maybeNewObject))
             {
                 needMoreMemory = true;
                 break;
@@ -101,7 +117,7 @@ while (true)
             switch (currentObject.Name)
             {
                 case "Trace":
-                    if (!NettraceReader.TryReadTrace(nettrace.Span[globalCursor..], out var maybeTrace))
+                    if (!NettraceReader.TryReadTrace(nettrace.Span[globalCursor..bufferEnd], out var maybeTrace))
                     {
                         needMoreMemory = true;
                         break;
@@ -112,9 +128,33 @@ while (true)
                     globalCursor += traceLength;
                     state = State.FinishObject;
                     break;
+                case var blockish when blockish.EndsWith("Block"):
+                    if (!NettraceReader.TryReadRawBlock(nettrace.Span[globalCursor..bufferEnd], currentObject, globalCursor, out var maybeRawBlock))
+                    {
+                        needMoreMemory = true;
+                        break;
+                    }
+
+                    var (rawBlockLength, rawBlock) = maybeRawBlock.Value;
+                    Console.WriteLine($"\tRaw Block: {rawBlock}");
+                    globalCursor += rawBlockLength;
+                    state = State.FinishObject;
+                    break;
                 default:
                     throw new NotImplementedException($"Reading {currentObject.Name} - {currentObject.Version} is not implemented.");
             }
+            break;
+        case State.FinishObject:
+            if (!NettraceReader.TryFinishObject(nettrace.Span[globalCursor..bufferEnd], out var finishObjectLength))
+            {
+                needMoreMemory = true;
+                break;
+            }
+            
+            globalCursor += finishObjectLength.Value;
+            Console.WriteLine($"Finish current object: {currentObject}.");
+            currentObject = null;
+            state = State.StartObject;
             break;
         default:
             throw new NotImplementedException($"{state} is not implemented");
