@@ -72,7 +72,7 @@ public static class NettraceReader
     }
     public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload);
     public record Event(ReadOnlyMemory<byte> Bytes);
-    public sealed record RawBlock(Type Type, ReadOnlyMemory<byte> Payload);
+    public sealed record RawBlock(Type Type, int GlobalCursor, ReadOnlyMemory<byte> Payload);
     public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs)
     {
         private bool PrintMembers(StringBuilder builder)
@@ -135,6 +135,7 @@ public static class NettraceReader
         
         Span<byte> buffer = new byte[stream.Length - 8];
         stream.ReadExactly(buffer);
+        int globalCursor = 8;
 
         if (!TryReadString(buffer, out var maybeStreamHeader))
         {
@@ -142,7 +143,7 @@ public static class NettraceReader
         }
         
         var (streamHeaderLength, streamHeader) = maybeStreamHeader.Value;
-        buffer = buffer[streamHeaderLength..];
+        globalCursor += streamHeaderLength;
 
         Trace? trace = null;
         Type? traceType = null;
@@ -151,52 +152,52 @@ public static class NettraceReader
         List<Block<Event>> eventBlocks = [];
         SequencePointBlock? sequencePointBlock = null;
 
-        while (TryStartObject(buffer, out var maybeType))
+        while (TryStartObject(buffer[globalCursor..], out var maybeType))
         {
             var (typeLength, type) = maybeType.Value;
-            buffer = buffer[typeLength..];
+            globalCursor += typeLength;
             
             switch (type.Name)
             {
                 case "Trace":
                     traceType = type;
-                    if (!TryDecodeTrace(buffer, out var maybeTrace))
-                        throw new InvalidOperationException($"Failed to decode trace. Buffer: {buffer.Length}");
+                    if (!TryDecodeTrace(buffer[globalCursor..], out var maybeTrace))
+                        throw new InvalidOperationException($"Failed to decode trace. Cursor: {globalCursor}");
                     (var traceLength, trace) = maybeTrace.Value;
-                    buffer = buffer[traceLength..];
+                    globalCursor += traceLength;
                     break;
                 case "MetadataBlock":
                     Debug.Assert(traceType is not null);
-                    if (!TryRawReadBlock(buffer, type, out var maybeMetadataRawBlock))
-                        throw new InvalidOperationException($"Failed to read raw block. Buffer: {buffer.Length}");
+                    if (!TryRawReadBlock(buffer[globalCursor..], type, globalCursor, out var maybeMetadataRawBlock))
+                        throw new InvalidOperationException($"Failed to read raw block. Cursor: {globalCursor}");
                     var (metadataRawBlockLength, metadataRawBlock) = maybeMetadataRawBlock.Value;
-                    buffer = buffer[metadataRawBlockLength..];
+                    globalCursor += metadataRawBlockLength;
                     var metadataBlock = BlockDecoder(metadataRawBlock, MetadataEventDecoder(metadataRawBlock));
                     metadataBlocks.Add(metadataBlock);
                     break;
                 case "StackBlock":
                     Debug.Assert(traceType is not null);
-                    if (!TryRawReadBlock(buffer, type, out var maybeStackRawBlock))
-                        throw new InvalidOperationException($"Failed to read raw block. Buffer: {buffer.Length}");
+                    if (!TryRawReadBlock(buffer[globalCursor..], type, globalCursor, out var maybeStackRawBlock))
+                        throw new InvalidOperationException($"Failed to read raw block. Cursor: {globalCursor}");
                     var (stackRawBlockLength, stackRawBlock) = maybeStackRawBlock.Value;
-                    buffer = buffer[stackRawBlockLength..];
+                    globalCursor += stackRawBlockLength;
                     stack = StackBlockDecoder(stackRawBlock);
                     break;
                 case "EventBlock":
                     Debug.Assert(traceType is not null);
-                    if (!TryRawReadBlock(buffer, type, out var maybeEventRawBlock))
-                        throw new InvalidOperationException($"Failed to read raw block. Buffer: {buffer.Length}");
+                    if (!TryRawReadBlock(buffer[globalCursor..], type, globalCursor, out var maybeEventRawBlock))
+                        throw new InvalidOperationException($"Failed to read raw block. Cursor: {globalCursor}");
                     var (eventRawBlockLength, eventRawBlock) = maybeEventRawBlock.Value;
-                    buffer = buffer[eventRawBlockLength..];
+                    globalCursor += eventRawBlockLength;
                     var eventBlock = BlockDecoder(eventRawBlock, EventDecoder);
                     eventBlocks.Add(eventBlock);
                     break;
                 case "SPBlock":
                     Debug.Assert(traceType is not null);
-                    if (!TryRawReadBlock(buffer, type, out var maybeSpRawBlock))
-                        throw new InvalidOperationException($"Failed to read raw block. Buffer: {buffer.Length}");
+                    if (!TryRawReadBlock(buffer[globalCursor..], type, globalCursor, out var maybeSpRawBlock))
+                        throw new InvalidOperationException($"Failed to read raw block. Cursor: {globalCursor}");
                     var (spRawBlockLength, spRawBlock) = maybeSpRawBlock.Value;
-                    buffer = buffer[spRawBlockLength..];
+                    globalCursor += spRawBlockLength;
                     sequencePointBlock = SequencePointBlockDecoder(spRawBlock);
                     break;
                 default:
@@ -204,7 +205,7 @@ public static class NettraceReader
             }
             var cursor = 0;
             FinishObject(buffer, ref cursor);
-            buffer = buffer[cursor..];
+            globalCursor += cursor;
         }
 
         return new(
@@ -345,7 +346,7 @@ public static class NettraceReader
 
     public delegate T PayloadDecoder<T>(in ReadOnlySpan<byte> bytes);
 
-    private static bool TryRawReadBlock(ReadOnlySpan<byte> data, Type type, [NotNullWhen(true)] out (int, RawBlock)? result)
+    private static bool TryRawReadBlock(ReadOnlySpan<byte> data, Type type, int globalCursor, [NotNullWhen(true)] out (int, RawBlock)? result)
     {
         if (data.Length < sizeof(int))
         {
@@ -365,7 +366,7 @@ public static class NettraceReader
         // TODO: Align(stream);
         Memory<byte> buffer = new byte[blockSize];
         data[cursor..MoveBy(ref cursor, blockSize)].CopyTo(buffer.Span);
-        result = (cursor, new(type, buffer));
+        result = (cursor, new(type, globalCursor + cursor - blockSize, buffer));
         return true;
     }
 
@@ -374,10 +375,10 @@ public static class NettraceReader
         ReadOnlySpan<byte> blockBytes = rawBlock.Payload.Span;
 
         int cursor = 0;
-        var headerSize = MemoryMarshal.Read<short>(blockBytes[cursor..MoveBy(ref cursor, 2)]);
-        var flags = MemoryMarshal.Read<short>(blockBytes[cursor..MoveBy(ref cursor, 2)]);
-        var minTimestamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
-        var maxTimestamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
+        var headerSize = MemoryMarshal.Read<short>(blockBytes[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var flags = MemoryMarshal.Read<short>(blockBytes[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var minTimestamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, sizeof(long))]);
+        var maxTimestamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, sizeof(long))]);
 
         var reserved = blockBytes[cursor..MoveBy(ref cursor, headerSize - cursor)];
 
