@@ -132,17 +132,17 @@ public static class NettraceReader
     {
         Memory<byte> memory = new byte[stream.Length];
         stream.ReadExactly(memory.Span);
-        
+
         int globalCursor = 0;
         ReadOnlySpan<byte> buffer = memory.Span;
-        
+
         ReadOnlySpan<byte> magic = buffer[..MoveBy(ref globalCursor, 8)];
 
         if (!TryReadString(buffer[globalCursor..], out var maybeStreamHeader))
         {
             throw new InvalidOperationException($"Failed to read string header.");
         }
-        
+
         var (streamHeaderLength, streamHeader) = maybeStreamHeader.Value;
         globalCursor += streamHeaderLength;
 
@@ -157,7 +157,7 @@ public static class NettraceReader
         {
             var (typeLength, type) = maybeType.Value;
             globalCursor += typeLength;
-            
+
             switch (type.Name)
             {
                 case "Trace":
@@ -204,7 +204,7 @@ public static class NettraceReader
                 default:
                     throw new NotImplementedException($"Unknown object type: {type}");
             }
-            
+
             if (!TryFinishObject(buffer, out var maybeFinishObjectLength))
                 throw new InvalidOperationException($"Failed to finish object. Cursor {globalCursor}");
             globalCursor += maybeFinishObjectLength.Value;
@@ -226,7 +226,7 @@ public static class NettraceReader
             result = null;
             return false;
         }
-        
+
         int cursor = 0;
 
         var tag = ReadTag(buffer[cursor++]);
@@ -280,7 +280,7 @@ public static class NettraceReader
             type = null;
             return false;
         }
-        
+
         var (nameByteLength, name) = maybeName.Value;
         MoveBy(ref cursor, nameByteLength);
 
@@ -299,7 +299,7 @@ public static class NettraceReader
         }
 
         int cursor = 0;
-        
+
         var year = ReadInt16(buffer[cursor..MoveBy(ref cursor, sizeof(short))]);
         var month = ReadInt16(buffer[cursor..MoveBy(ref cursor, sizeof(short))]);
         var dayOfWeek = ReadInt16(buffer[cursor..MoveBy(ref cursor, sizeof(short))]);
@@ -314,7 +314,7 @@ public static class NettraceReader
         var processId = ReadInt32(buffer[cursor..MoveBy(ref cursor, sizeof(int))]);
         var numberOfProcessors = ReadInt32(buffer[cursor..MoveBy(ref cursor, sizeof(int))]);
         var expectedCpuSamplingRate = ReadInt32(buffer[cursor..MoveBy(ref cursor, sizeof(int))]);
-        
+
         result = (cursor, new(
             new(year, month, day, hour, minute, second, millisecond),
             syncTimeQpc,
@@ -336,7 +336,7 @@ public static class NettraceReader
             result = null;
             return false;
         }
-        
+
         int cursor = 0;
         var blockSize = ReadInt32(buffer[cursor..MoveBy(ref cursor, sizeof(int))]);
 
@@ -415,7 +415,7 @@ public static class NettraceReader
 
         return new(rawBlock.Buffer.Length, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), [.. eventBlobs]);
     }
-    
+
     private static PayloadDecoder<MetadataEvent> MetadataEventDecoder(RawBlock rawBlock)
         => (in ReadOnlySpan<byte> buffer) => MetadataEventDecoder(in buffer, rawBlock.Type.Version);
 
@@ -500,7 +500,7 @@ public static class NettraceReader
     private static SequencePointBlock SequencePointBlockDecoder(RawBlock block)
     {
         ReadOnlySpan<byte> blockBuffer = block.Buffer.Span;
-        
+
         int cursor = 0;
 
         long timeStamp = MemoryMarshal.Read<long>(blockBuffer[cursor..MoveBy(ref cursor, 8)]);
@@ -543,7 +543,7 @@ public static class NettraceReader
             result = null;
             return false;
         }
-        
+
         var @string = Encoding.UTF8.GetString(data[cursor..MoveBy(ref cursor, length)]);
         result = (cursor, @string);
         return true;

@@ -46,7 +46,7 @@ if (sent != buffer.Length) throw new InvalidOperationException($"Failed to send 
 
 Console.WriteLine($"Command CollectTracing: sent {sent}.");
 
-var responseMemory = new byte[HEADER_SIZE + sizeof(ulong)]; 
+var responseMemory = new byte[HEADER_SIZE + sizeof(ulong)];
 var responseLength = await socket.ReceiveAsync(responseMemory);
 Console.WriteLine($"Read {responseLength} data.");
 var maybeError = TryReadCollectTracingResponse(responseMemory.AsSpan(0, responseLength), out var sessionId);
@@ -54,7 +54,7 @@ if (maybeError.HasValue) throw new InvalidOperationException($"Failed to get col
 Console.WriteLine($"Session Id: {sessionId}");
 
 var state = State.ReadingNewObject;
-NettraceReader.Type? currentObject = null; 
+NettraceReader.Type? currentObject = null;
 
 while (true)
 {
@@ -94,7 +94,7 @@ static ReadOnlyMemory<byte>? TryCollectTracingCommand(IReadOnlyCollection<Provid
     byte collectTracingCommandId = 0x02;
     int eventPipeCommandSetIndex = 16;
     int collectTracingCommandIdIndex = 17;
-    
+
     buffer[eventPipeCommandSetIndex] = eventPipeCommandSet;
     buffer[collectTracingCommandIdIndex] = collectTracingCommandId;
 
@@ -166,4 +166,4 @@ enum State
 {
     ReadingNewObject,
     PayloadParsing,
-} 
+}
