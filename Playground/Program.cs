@@ -35,8 +35,10 @@ Console.WriteLine($"Connected? {socket.Connected}");
 
 IReadOnlyCollection<Provider> providers =
 [
-    new("ProfileMe", ulong.MaxValue, 0, string.Empty),
     new("Microsoft-Windows-DotNETRuntime", ulong.MaxValue, 0, string.Empty),
+    new("Microsoft-DotNETCore-SampleProfiler", ulong.MaxValue, 0, string.Empty),
+    new("System.Threading.Tasks.TplEventSource", ulong.MaxValue, 0, string.Empty),
+    new("ProfileMe", ulong.MaxValue, 0, string.Empty),
 ];
 
 var buffer = TryCollectTracingCommand(providers)
@@ -62,23 +64,36 @@ int globalCursor = 0;
 int bufferEnd = 0;
 bool needMoreMemory = true;
 
+var stopwatch = new Stopwatch();
+
 while (true)
 {
     if (needMoreMemory)
     {
-        var read = await socket.ReceiveAsync(nettrace[bufferEnd..]);
-        bufferEnd += read;
-        if (bufferEnd == nettrace.Length)
+        long timeToRead = 0;
+        for (int attempt = 0; attempt < 100 && timeToRead < 100; ++attempt)
         {
-            var newNettrace = new byte[nettrace.Length * 8];
-            nettrace.CopyTo(newNettrace);
-            nettrace = newNettrace;
+            stopwatch.Start();
+            var read = await socket.ReceiveAsync(nettrace[bufferEnd..]);
+            stopwatch.Stop();
+            timeToRead = stopwatch.ElapsedMilliseconds;
+            bufferEnd += read;
+            if (bufferEnd == nettrace.Length)
+            {
+                var newNettrace = new byte[nettrace.Length * 2];
+                bufferEnd -= globalCursor;
+                nettrace.Span[globalCursor..].CopyTo(newNettrace);
+                nettrace = newNettrace;
+            }
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"Parsing - Receive {read} bytes. Time to read - {stopwatch.ElapsedMilliseconds} ms");
+            Console.WriteLine($"Buffer Length - {nettrace.Length} ({nettrace.Length / 1e6d} Mb)");
+            Console.WriteLine($"Global Cursor - {globalCursor} | Buffer End  - {bufferEnd} | Space Taken: {bufferEnd - globalCursor} ({(bufferEnd / (float)nettrace.Length) * 100:F2}%)");
+            Console.ResetColor();
+            stopwatch.Reset();
         }
 
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"Parsing - Receive {read} bytes");
-        Console.WriteLine($"Buffer Length - {nettrace.Length} ({nettrace.Length / 1e6d} Mb) | Global Cursor - {globalCursor} | Buffer End  - {bufferEnd}");
-        Console.ResetColor();
         needMoreMemory = false;
     }
 
@@ -172,6 +187,7 @@ static ReadOnlyMemory<byte>? TryCollectTracingCommand(IReadOnlyCollection<Provid
         var providerName = Encoding.Unicode.GetBytes($"{provider.Name}\0").AsSpan();
         BinaryPrimitives.TryWriteUInt32LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], (uint)provider.Name.Length + 1);
         providerName.CopyTo(buffer[cursor..MoveBy(ref cursor, providerName.Length)]);
+        BinaryPrimitives.TryWriteUInt32LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], 0);
         return cursor;
     }
 
@@ -191,7 +207,7 @@ static ReadOnlyMemory<byte>? TryCollectTracingCommand(IReadOnlyCollection<Provid
 
     var cursor = 20;
 
-    uint circularBufferMb = 1;
+    uint circularBufferMb = 1000;
     if (!BinaryPrimitives.TryWriteUInt32LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], circularBufferMb))
         return null;
 
