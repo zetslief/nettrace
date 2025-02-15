@@ -81,8 +81,7 @@ while (true)
             if (bufferEnd == nettrace.Length)
             {
                 var newNettrace = new byte[nettrace.Length * 2];
-                bufferEnd -= globalCursor;
-                nettrace.Span[globalCursor..].CopyTo(newNettrace);
+                nettrace.CopyTo(newNettrace);
                 nettrace = newNettrace;
             }
 
