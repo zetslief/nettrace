@@ -72,7 +72,7 @@ public static class NettraceReader
     }
     public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload);
     public record Event(ReadOnlyMemory<byte> Bytes);
-    public sealed record RawBlock(Type Type, int GlobalCursor, ReadOnlyMemory<byte> Payload);
+    private sealed record RawBlock(Type Type, ReadOnlyMemory<byte> Payload);
     public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs)
     {
         private bool PrintMembers(StringBuilder builder)
@@ -341,7 +341,7 @@ public static class NettraceReader
         cursor += alignLength;
         Memory<byte> buffer = new byte[blockSize];
         data[cursor..MoveBy(ref cursor, blockSize)].CopyTo(buffer.Span);
-        result = (cursor, new(type, globalCursor + cursor - blockSize, buffer));
+        result = (cursor, new(type, buffer));
         return true;
     }
 
