@@ -75,11 +75,46 @@ while (true)
             break;
         case State.StreamHeader:
             if (!NettraceReader.TryReadStreamHeader(nettrace.Span[globalCursor..], out var maybeStreamHeader))
+            {
+                needMoreMemory = true;
                 break;
+            }
             var (streamHeaderLength, streamHeader) = maybeStreamHeader.Value;
             Console.WriteLine($"Stream Header: {streamHeader}");
             globalCursor += streamHeaderLength;
+            state = State.StartObject;
+            break;
+        case State.StartObject:
+            if (!NettraceReader.TryStartObject(nettrace.Span[globalCursor..], out var maybeNewObject))
+            {
+                needMoreMemory = true;
+                break;
+            }
+            var (newObjectLength, newObject) = maybeNewObject.Value;
+            Console.WriteLine($"New object: {newObject}");
+            globalCursor += newObjectLength;
+            currentObject = newObject;
             state = State.NewObject;
+            break;
+        case State.NewObject:
+            Debug.Assert(currentObject is not null);
+            switch (currentObject.Name)
+            {
+                case "Trace":
+                    if (!NettraceReader.TryReadTrace(nettrace.Span[globalCursor..], out var maybeTrace))
+                    {
+                        needMoreMemory = true;
+                        break;
+                    }
+                    
+                    var (traceLength, trace) = maybeTrace.Value;
+                    Console.WriteLine($"Trace: {trace}");
+                    globalCursor += traceLength;
+                    state = State.FinishObject;
+                    break;
+                default:
+                    throw new NotImplementedException($"Reading {currentObject.Name} - {currentObject.Version} is not implemented.");
+            }
             break;
         default:
             throw new NotImplementedException($"{state} is not implemented");
@@ -181,7 +216,7 @@ enum State
 {
     Magic,
     StreamHeader,
+    StartObject,
     NewObject,
-    PayloadParsing,
     FinishObject,
 }

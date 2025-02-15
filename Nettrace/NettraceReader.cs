@@ -150,7 +150,7 @@ public static class NettraceReader
         List<Block<Event>> eventBlocks = [];
         SequencePointBlock? sequencePointBlock = null;
 
-        while (globalCursor < buffer.Length && TryStartObject(buffer[globalCursor..], out var maybeType))
+        while (TryStartObject(buffer[globalCursor..], out var maybeType))
         {
             var (typeLength, type) = maybeType.Value;
             globalCursor += typeLength;
