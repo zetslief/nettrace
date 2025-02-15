@@ -14,7 +14,7 @@ public static class NettraceReader
         EndObject = 6,
     }
 
-    public record Type(Tag Tag, string Name, int Vesrion, int MinimumReaderVersion);
+    public record Type(Tag Tag, string Name, int Version, int MinimumReaderVersion);
     public record Trace(
         DateTime DateTime,
         long SynTimeQpc,
@@ -45,12 +45,12 @@ public static class NettraceReader
         long TimeStamp, Guid ActivityId, Guid RelatedActivityId, bool IsSorted, int PayloadSize, TPayload Payload
     )
     {
-        public static EventBlob<TPayload> Create(byte Flags, TPayload Payload, in EventBlobParserContext context) => new(
-            Flags,
+        public static EventBlob<TPayload> Create(byte flags, TPayload payload, in EventBlobParserContext context) => new(
+            flags,
             context.MetadataId, context.SequenceNumber, context.CaptureThreadId,
             context.ProcessorNumber, context.ThreadId, context.StackId,
             context.TimeStamp, context.ActivityId, context.RelatedActivityId, context.IsSorted, context.PayloadSize,
-            Payload
+            payload
         );
     }
     public record MetadataHeader(
@@ -72,7 +72,7 @@ public static class NettraceReader
     }
     public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload);
     public record Event(ReadOnlyMemory<byte> Bytes);
-    private sealed record RawBlock(Type Type, ReadOnlyMemory<byte> Payload);
+    private sealed record RawBlock(Type Type, ReadOnlyMemory<byte> Buffer);
     public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs)
     {
         private bool PrintMembers(StringBuilder builder)
@@ -204,9 +204,10 @@ public static class NettraceReader
                 default:
                     throw new NotImplementedException($"Unknown object type: {type}");
             }
-            var cursor = 0;
-            FinishObject(buffer, ref cursor);
-            globalCursor += cursor;
+            
+            if (!TryFinishObject(buffer, out var maybeFinishObjectLength))
+                throw new InvalidOperationException($"Failed to finish object. Cursor {globalCursor}");
+            globalCursor += maybeFinishObjectLength.Value;
         }
 
         return new(
@@ -218,9 +219,9 @@ public static class NettraceReader
             sequencePointBlock ?? throw new InvalidOperationException("File dosn't contain SPB."));
     }
 
-    public static bool TryStartObject(ReadOnlySpan<byte> stream, [NotNullWhen(true)] out (int, Type)? result)
+    public static bool TryStartObject(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out (int, Type)? result)
     {
-        if (stream.Length < sizeof(byte))
+        if (buffer.Length < sizeof(byte))
         {
             result = null;
             return false;
@@ -228,10 +229,10 @@ public static class NettraceReader
         
         int cursor = 0;
 
-        var tag = ReadTag(stream[cursor++]);
+        var tag = ReadTag(buffer[cursor++]);
         if (tag == Tag.BeginPrivateObject)
         {
-            if (!TryReadType(stream, ref cursor, out var maybeType))
+            if (!TryReadType(buffer, ref cursor, out var maybeType))
             {
                 result = null;
                 return false;
@@ -248,25 +249,33 @@ public static class NettraceReader
         }
     }
 
-    private static void FinishObject(ReadOnlySpan<byte> stream, ref int cursor)
+    private static bool TryFinishObject(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out int? finishObjectLength)
     {
-        var _endObject = ReadTag(stream[cursor++]);
+        if (buffer.Length < 1)
+        {
+            finishObjectLength = null;
+            return false;
+        }
+
+        var _endObject = ReadTag(buffer[0]);
+        finishObjectLength = 1;
+        return true;
     }
 
-    private static bool TryReadType(ReadOnlySpan<byte> data, ref int cursor, [NotNullWhen(true)] out Type? type)
+    private static bool TryReadType(ReadOnlySpan<byte> buffer, ref int cursor, [NotNullWhen(true)] out Type? type)
     {
-        if (data.Length < cursor + 11)
+        if (buffer.Length < cursor + 11)
         {
             type = null;
             return false;
         }
 
-        var beginPrivateObject = ReadTag(data[cursor++]);
+        var beginPrivateObject = ReadTag(buffer[cursor++]);
 
-        var tag = ReadTag(data[cursor++]);
-        var version = ReadInt32(data[cursor..MoveBy(ref cursor, sizeof(int))]);
-        var minimumReaderVersion = ReadInt32(data[cursor..MoveBy(ref cursor, sizeof(int))]);
-        if (!TryReadString(data[cursor..], out var maybeName))
+        var tag = ReadTag(buffer[cursor++]);
+        var version = ReadInt32(buffer[cursor..MoveBy(ref cursor, sizeof(int))]);
+        var minimumReaderVersion = ReadInt32(buffer[cursor..MoveBy(ref cursor, sizeof(int))]);
+        if (!TryReadString(buffer[cursor..], out var maybeName))
         {
             type = null;
             return false;
@@ -275,15 +284,15 @@ public static class NettraceReader
         var (nameByteLength, name) = maybeName.Value;
         MoveBy(ref cursor, nameByteLength);
 
-        var endObject = ReadTag(data[cursor++]);
+        var endObject = ReadTag(buffer[cursor++]);
 
         type = new(tag, name, version, minimumReaderVersion);
         return true;
     }
 
-    private static bool TryDecodeTrace(ReadOnlySpan<byte> stream, [NotNullWhen(true)] out (int, Trace)? result)
+    private static bool TryDecodeTrace(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out (int, Trace)? result)
     {
-        if (stream.Length < 48)
+        if (buffer.Length < 48)
         {
             result = null;
             return false;
@@ -291,20 +300,20 @@ public static class NettraceReader
 
         int cursor = 0;
         
-        var year = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
-        var month = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
-        var dayOfWeek = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
-        var day = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
-        var hour = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
-        var minute = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
-        var second = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
-        var millisecond = ReadInt16(stream[cursor..MoveBy(ref cursor, sizeof(short))]);
-        var syncTimeQpc = ReadInt64(stream[cursor..MoveBy(ref cursor, sizeof(long))]);
-        var qpcFrequency = ReadInt64(stream[cursor..MoveBy(ref cursor, sizeof(long))]);
-        var pointerSize = ReadInt32(stream[cursor..MoveBy(ref cursor, sizeof(int))]);
-        var processId = ReadInt32(stream[cursor..MoveBy(ref cursor, sizeof(int))]);
-        var numberOfProcessors = ReadInt32(stream[cursor..MoveBy(ref cursor, sizeof(int))]);
-        var expectedCpuSamplingRate = ReadInt32(stream[cursor..MoveBy(ref cursor, sizeof(int))]);
+        var year = ReadInt16(buffer[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var month = ReadInt16(buffer[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var dayOfWeek = ReadInt16(buffer[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var day = ReadInt16(buffer[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var hour = ReadInt16(buffer[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var minute = ReadInt16(buffer[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var second = ReadInt16(buffer[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var millisecond = ReadInt16(buffer[cursor..MoveBy(ref cursor, sizeof(short))]);
+        var syncTimeQpc = ReadInt64(buffer[cursor..MoveBy(ref cursor, sizeof(long))]);
+        var qpcFrequency = ReadInt64(buffer[cursor..MoveBy(ref cursor, sizeof(long))]);
+        var pointerSize = ReadInt32(buffer[cursor..MoveBy(ref cursor, sizeof(int))]);
+        var processId = ReadInt32(buffer[cursor..MoveBy(ref cursor, sizeof(int))]);
+        var numberOfProcessors = ReadInt32(buffer[cursor..MoveBy(ref cursor, sizeof(int))]);
+        var expectedCpuSamplingRate = ReadInt32(buffer[cursor..MoveBy(ref cursor, sizeof(int))]);
         
         result = (cursor, new(
             new(year, month, day, hour, minute, second, millisecond),
@@ -318,20 +327,20 @@ public static class NettraceReader
         return true;
     }
 
-    public delegate T PayloadDecoder<T>(in ReadOnlySpan<byte> bytes);
+    public delegate T PayloadDecoder<T>(in ReadOnlySpan<byte> buffer);
 
-    private static bool TryReadRawBlock(ReadOnlySpan<byte> data, Type type, int globalCursor, [NotNullWhen(true)] out (int, RawBlock)? result)
+    private static bool TryReadRawBlock(ReadOnlySpan<byte> buffer, Type type, int globalCursor, [NotNullWhen(true)] out (int, RawBlock)? result)
     {
-        if (data.Length < sizeof(int))
+        if (buffer.Length < sizeof(int))
         {
             result = null;
             return false;
         }
         
         int cursor = 0;
-        var blockSize = ReadInt32(data[cursor..MoveBy(ref cursor, sizeof(int))]);
+        var blockSize = ReadInt32(buffer[cursor..MoveBy(ref cursor, sizeof(int))]);
 
-        if (cursor + blockSize > data.Length)
+        if (cursor + blockSize > buffer.Length)
         {
             result = null;
             return false;
@@ -339,15 +348,15 @@ public static class NettraceReader
 
         var alignLength = Align(globalCursor);
         cursor += alignLength;
-        Memory<byte> buffer = new byte[blockSize];
-        data[cursor..MoveBy(ref cursor, blockSize)].CopyTo(buffer.Span);
-        result = (cursor, new(type, buffer));
+        Memory<byte> blockBuffer = new byte[blockSize];
+        buffer[cursor..MoveBy(ref cursor, blockSize)].CopyTo(blockBuffer.Span);
+        result = (cursor, new(type, blockBuffer));
         return true;
     }
 
     private static Block<T> BlockDecoder<T>(RawBlock rawBlock, PayloadDecoder<T> payloadDecoder)
     {
-        ReadOnlySpan<byte> blockBytes = rawBlock.Payload.Span;
+        ReadOnlySpan<byte> blockBytes = rawBlock.Buffer.Span;
 
         int cursor = 0;
         var headerSize = MemoryMarshal.Read<short>(blockBytes[cursor..MoveBy(ref cursor, sizeof(short))]);
@@ -363,7 +372,6 @@ public static class NettraceReader
         }
 
         // parsing event blobs
-
         // parser state for this block
         EventBlobParserContext context = default;
 
@@ -405,58 +413,58 @@ public static class NettraceReader
             eventBlobs.Add(EventBlob<T>.Create(flag, payloadDecoder(in payload), in context));
         }
 
-        return new(rawBlock.Payload.Length, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), [.. eventBlobs]);
+        return new(rawBlock.Buffer.Length, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), [.. eventBlobs]);
     }
     
     private static PayloadDecoder<MetadataEvent> MetadataEventDecoder(RawBlock rawBlock)
-        => (in ReadOnlySpan<byte> bytes) => MetadataEventDecoder(in bytes, rawBlock.Type.Vesrion);
+        => (in ReadOnlySpan<byte> buffer) => MetadataEventDecoder(in buffer, rawBlock.Type.Version);
 
-    private static MetadataEvent MetadataEventDecoder(in ReadOnlySpan<byte> bytes, int fileVersion)
+    private static MetadataEvent MetadataEventDecoder(in ReadOnlySpan<byte> buffer, int fileVersion)
     {
         int cursor = 0;
 
-        var payloadMetadataId = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
-        var providerName = ReadUnicode(bytes, ref cursor);
-        var eventId = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
-        var eventName = ReadUnicode(bytes, ref cursor);
-        long keywords = MemoryMarshal.Read<long>(bytes[cursor..MoveBy(ref cursor, 8)]);
-        int version = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
-        int level = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+        var payloadMetadataId = MemoryMarshal.Read<int>(buffer[cursor..MoveBy(ref cursor, 4)]);
+        var providerName = ReadUnicode(buffer, ref cursor);
+        var eventId = MemoryMarshal.Read<int>(buffer[cursor..MoveBy(ref cursor, 4)]);
+        var eventName = ReadUnicode(buffer, ref cursor);
+        long keywords = MemoryMarshal.Read<long>(buffer[cursor..MoveBy(ref cursor, 8)]);
+        int version = MemoryMarshal.Read<int>(buffer[cursor..MoveBy(ref cursor, 4)]);
+        int level = MemoryMarshal.Read<int>(buffer[cursor..MoveBy(ref cursor, 4)]);
 
         var fieldsV1 = new List<FieldV1>();
 
         // if the metadata event specifies a V2Params tag, the event must have an empty V1 parameter FieldCount
         // and no field definitions.
-        int fieldCount = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+        int fieldCount = MemoryMarshal.Read<int>(buffer[cursor..MoveBy(ref cursor, 4)]);
         for (int fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex)
         {
-            int typeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
-            string fieldName = ReadUnicode(bytes, ref cursor);
+            int typeCode = MemoryMarshal.Read<int>(buffer[cursor..MoveBy(ref cursor, 4)]);
+            string fieldName = ReadUnicode(buffer, ref cursor);
             fieldsV1.Add(new(typeCode, fieldName));
         }
 
         if (fileVersion >= 5)
         {
-            int tagPaylodBytes = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
-            byte tagKind = bytes[cursor++];
+            int tagPaylodBytes = MemoryMarshal.Read<int>(buffer[cursor..MoveBy(ref cursor, 4)]);
+            byte tagKind = buffer[cursor++];
             // followed by tag payload
             const byte opCode = 1;
             const byte v2Params = 2;
             switch (tagKind)
             {
                 case opCode:
-                    byte eventOpCode = bytes[cursor++];
+                    byte eventOpCode = buffer[cursor++];
                     break;
                 case v2Params:
-                    int v2FieldCount = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
-                    int v2TypeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+                    int v2FieldCount = MemoryMarshal.Read<int>(buffer[cursor..MoveBy(ref cursor, 4)]);
+                    int v2TypeCode = MemoryMarshal.Read<int>(buffer[cursor..MoveBy(ref cursor, 4)]);
                     const int eventPipeTypeCodeArray = 19;
                     if (v2TypeCode == eventPipeTypeCodeArray)
                     {
-                        int arrayTypeCode = MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, 4)]);
+                        int arrayTypeCode = MemoryMarshal.Read<int>(buffer[cursor..MoveBy(ref cursor, 4)]);
                     }
                     // TODO: payload description (it also may be that description does not exist :))
-                    string v2FieldName = ReadUnicode(bytes, ref cursor);
+                    string v2FieldName = ReadUnicode(buffer, ref cursor);
                     break;
                 default:
                     throw new NotSupportedException($"Unknown tag kind: '{tagKind}'!");
@@ -470,56 +478,43 @@ public static class NettraceReader
         return new(metadataEventHeader, metadataPayload);
     }
 
-    private static Event EventDecoder(in ReadOnlySpan<byte> bytes) => new(bytes.ToArray());
-
-    private static byte[] RawEventDecoder(in ReadOnlySpan<byte> bytes)
-        => bytes.ToArray();
+    private static Event EventDecoder(in ReadOnlySpan<byte> buffer) => new(buffer.ToArray());
 
     private static StackBlock StackBlockDecoder(RawBlock block)
     {
-        ReadOnlySpan<byte> blockBytes = block.Payload.Span;
+        ReadOnlySpan<byte> blockBuffer = block.Buffer.Span;
         var cursor = 0;
 
-        var firstId = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
-        var count = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
+        var firstId = MemoryMarshal.Read<int>(blockBuffer[cursor..MoveBy(ref cursor, 4)]);
+        var count = MemoryMarshal.Read<int>(blockBuffer[cursor..MoveBy(ref cursor, 4)]);
 
         var stacks = new Stack[count];
         for (int stackIndex = 0; stackIndex < stacks.Length; ++stackIndex)
         {
-            var stackSize = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
-            stacks[stackIndex] = new(stackSize, [.. blockBytes[cursor..MoveBy(ref cursor, stackSize)]]);
+            var stackSize = MemoryMarshal.Read<int>(blockBuffer[cursor..MoveBy(ref cursor, 4)]);
+            stacks[stackIndex] = new(stackSize, [.. blockBuffer[cursor..MoveBy(ref cursor, stackSize)]]);
         }
-        return new(blockBytes.Length, firstId, count, stacks);
+        return new(blockBuffer.Length, firstId, count, stacks);
     }
 
     private static SequencePointBlock SequencePointBlockDecoder(RawBlock block)
     {
-        ReadOnlySpan<byte> blockBytes = block.Payload.Span;
+        ReadOnlySpan<byte> blockBuffer = block.Buffer.Span;
         
         int cursor = 0;
 
-        long timeStamp = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
-        int threadCount = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
+        long timeStamp = MemoryMarshal.Read<long>(blockBuffer[cursor..MoveBy(ref cursor, 8)]);
+        int threadCount = MemoryMarshal.Read<int>(blockBuffer[cursor..MoveBy(ref cursor, 4)]);
 
         var threads = new EventThread[threadCount];
         for (int threadIndex = 0; threadIndex < threads.Length; ++threadIndex)
         {
-            long threadId = MemoryMarshal.Read<long>(blockBytes[cursor..MoveBy(ref cursor, 8)]);
-            int sequenceNumber = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
+            long threadId = MemoryMarshal.Read<long>(blockBuffer[cursor..MoveBy(ref cursor, 8)]);
+            int sequenceNumber = MemoryMarshal.Read<int>(blockBuffer[cursor..MoveBy(ref cursor, 4)]);
             threads[threadIndex] = new(threadId, sequenceNumber);
         }
 
-        return new(blockBytes.Length, timeStamp, threadCount, threads);
-    }
-
-    private static string SkipPayloadDecoder(Stream stream)
-    {
-        while (ReadByte(stream) != (byte)Tag.EndObject)
-        {
-            // skip
-        }
-        stream.Seek(-1, SeekOrigin.Current);
-        return "Empty";
+        return new(blockBuffer.Length, timeStamp, threadCount, threads);
     }
 
     private static int MoveBy(ref int value, int by)
@@ -533,7 +528,7 @@ public static class NettraceReader
 
     private static Tag ReadTag(byte data) => (Tag)data;
 
-    public static bool TryReadString(ReadOnlySpan<byte> data, [NotNullWhen(true)] out (int, string)? result)
+    private static bool TryReadString(ReadOnlySpan<byte> data, [NotNullWhen(true)] out (int, string)? result)
     {
         if (data.Length < sizeof(int))
         {
@@ -552,13 +547,6 @@ public static class NettraceReader
         var @string = Encoding.UTF8.GetString(data[cursor..MoveBy(ref cursor, length)]);
         result = (cursor, @string);
         return true;
-    }
-
-    private static byte ReadByte(Stream stream)
-    {
-        Span<byte> content = [0];
-        stream.ReadExactly(content);
-        return content[0];
     }
 
     private static short ReadInt16(ReadOnlySpan<byte> data)
@@ -620,45 +608,5 @@ public static class NettraceReader
         var providerNameBytes = bytes[startCursor..(cursor - 2)];
 
         return Encoding.Unicode.GetString(providerNameBytes);
-    }
-}
-
-internal static class Fmt
-{
-    public static void BytesHex(ReadOnlySpan<byte> bytes)
-    {
-        if (bytes.Length == 0) return;
-        foreach (var @byte in bytes[..^1])
-        {
-            ByteHex(@byte);
-            Console.Write(" ");
-        }
-        ByteHex(bytes[^1]);
-    }
-
-    public static void ByteHex(byte @byte)
-    {
-        Console.Write($"{@byte:X}");
-    }
-
-    public static void Bytes(ReadOnlySpan<byte> bytes)
-    {
-        if (bytes.Length == 0) return;
-        foreach (var @byte in bytes[..^1])
-        {
-            Byte(@byte);
-            Console.Write(" ");
-        }
-        Byte(bytes[^1]);
-    }
-
-    public static void Byte(byte @byte)
-    {
-        Console.Write($"{@byte:X}");
-    }
-
-    public static void Tag(byte @byte)
-    {
-        Console.Write((NettraceReader.Tag)@byte);
     }
 }
