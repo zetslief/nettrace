@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics.Tracing;
 
-var delay = TimeSpan.FromMilliseconds(10000);
+var delay = TimeSpan.FromMilliseconds(1000);
 int index = 0;
 
 while (true)
@@ -8,7 +8,7 @@ while (true)
     var time = DateTime.Now;
     ProfileMe.Log.Tick(time);
     Console.WriteLine($"{index++} : {time}");
-    Work(1000);
+    Work(10000);
     await Task.Delay(delay).ConfigureAwait(false);
 }
 

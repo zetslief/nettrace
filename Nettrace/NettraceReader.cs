@@ -284,6 +284,12 @@ public static class NettraceReader
         var (nameByteLength, name) = maybeName.Value;
         MoveBy(ref cursor, nameByteLength);
 
+        if (cursor + 1 >= buffer.Length)
+        {
+            type = null;
+            return false;
+        }
+
         var endObject = ReadTag(buffer[cursor++]);
 
         type = new(tag, name, version, minimumReaderVersion);
@@ -340,9 +346,6 @@ public static class NettraceReader
         
         var alignLength = Align(globalCursor);
         cursor += alignLength;
-        
-        Console.WriteLine($"Global cursor: {globalCursor}");
-        Console.WriteLine($"Cursor {cursor} | Block Size {blockSize} | Buffer Size {buffer.Length}");
 
         if (cursor + blockSize > buffer.Length)
         {

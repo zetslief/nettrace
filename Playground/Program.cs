@@ -36,6 +36,7 @@ Console.WriteLine($"Connected? {socket.Connected}");
 IReadOnlyCollection<Provider> providers =
 [
     new("ProfileMe", ulong.MaxValue, 0, string.Empty),
+    new("Microsoft-Windows-DotNETRuntime", ulong.MaxValue, 0, string.Empty),
 ];
 
 var buffer = TryCollectTracingCommand(providers)
@@ -76,7 +77,7 @@ while (true)
 
         Console.ForegroundColor = ConsoleColor.Green;
         Console.WriteLine($"Parsing - Receive {read} bytes");
-        Console.WriteLine($"Buffer Length - {nettrace.Length} | Global Cursor - {globalCursor} | Buffer End  - {bufferEnd}");
+        Console.WriteLine($"Buffer Length - {nettrace.Length} ({nettrace.Length / 1e6d} Mb) | Global Cursor - {globalCursor} | Buffer End  - {bufferEnd}");
         Console.ResetColor();
         needMoreMemory = false;
     }
