@@ -72,7 +72,8 @@ public static class NettraceReader
     }
     public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload);
     public record Event(ReadOnlyMemory<byte> Bytes);
-    private sealed record RawBlock(Type Type, ReadOnlyMemory<byte> Buffer);
+    private delegate T PayloadDecoder<out T>(in ReadOnlySpan<byte> buffer);
+    public sealed record RawBlock(Type Type, ReadOnlyMemory<byte> Buffer);
     public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs)
     {
         private bool PrintMembers(StringBuilder builder)
@@ -117,8 +118,6 @@ public static class NettraceReader
             return true;
         }
     }
-    public record Object<T>(Type Type, T Payload);
-    public delegate bool ObjectDecoder<T>(ReadOnlySpan<byte> data, [NotNullWhen(true)] out (int, T) result);
     public record NettraceFile(
         string Magic,
         Trace Trace,
@@ -162,7 +161,7 @@ public static class NettraceReader
             {
                 case "Trace":
                     traceType = type;
-                    if (!TryDecodeTrace(buffer[globalCursor..], out var maybeTrace))
+                    if (!TryReadTrace(buffer[globalCursor..], out var maybeTrace))
                         throw new InvalidOperationException($"Failed to decode trace. Cursor: {globalCursor}");
                     (var traceLength, trace) = maybeTrace.Value;
                     globalCursor += traceLength;
@@ -249,7 +248,7 @@ public static class NettraceReader
         }
     }
 
-    private static bool TryFinishObject(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out int? finishObjectLength)
+    public static bool TryFinishObject(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out int? finishObjectLength)
     {
         if (buffer.Length < 1)
         {
@@ -262,7 +261,7 @@ public static class NettraceReader
         return true;
     }
 
-    private static bool TryReadType(ReadOnlySpan<byte> buffer, ref int cursor, [NotNullWhen(true)] out Type? type)
+    public static bool TryReadType(ReadOnlySpan<byte> buffer, ref int cursor, [NotNullWhen(true)] out Type? type)
     {
         if (buffer.Length < cursor + 11)
         {
@@ -290,7 +289,7 @@ public static class NettraceReader
         return true;
     }
 
-    private static bool TryDecodeTrace(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out (int, Trace)? result)
+    public static bool TryReadTrace(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out (int, Trace)? result)
     {
         if (buffer.Length < 48)
         {
@@ -327,9 +326,7 @@ public static class NettraceReader
         return true;
     }
 
-    public delegate T PayloadDecoder<T>(in ReadOnlySpan<byte> buffer);
-
-    private static bool TryReadRawBlock(ReadOnlySpan<byte> buffer, Type type, int globalCursor, [NotNullWhen(true)] out (int, RawBlock)? result)
+    public static bool TryReadRawBlock(ReadOnlySpan<byte> buffer, Type type, int globalCursor, [NotNullWhen(true)] out (int, RawBlock)? result)
     {
         if (buffer.Length < sizeof(int))
         {
