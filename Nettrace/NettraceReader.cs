@@ -71,8 +71,8 @@ public static class NettraceReader
         }
     }
     public record MetadataEvent(MetadataHeader Header, MetadataPayload Payload);
-    public record Event(byte[] Bytes);
-    public sealed record RawBlock(Type Type, Memory<byte> Payload);
+    public record Event(ReadOnlyMemory<byte> Bytes);
+    public sealed record RawBlock(Type Type, ReadOnlyMemory<byte> Payload);
     public sealed record Block<T>(int BlockSize, Header Header, EventBlob<T>[] EventBlobs)
     {
         private bool PrintMembers(StringBuilder builder)
@@ -132,8 +132,17 @@ public static class NettraceReader
     {
         Span<byte> magic = stackalloc byte[8];
         stream.ReadExactly(magic);
+        
+        Span<byte> buffer = new byte[stream.Length - 8];
+        stream.ReadExactly(buffer);
 
-        var streamHeader = ReadString(stream);
+        if (!TryReadString(buffer, out var maybeStreamHeader))
+        {
+            throw new InvalidOperationException($"Failed to read string header.");
+        }
+        
+        var (streamHeaderLength, streamHeader) = maybeStreamHeader.Value;
+        buffer = buffer[streamHeaderLength..];
 
         Trace? trace = null;
         Type? traceType = null;
@@ -142,35 +151,60 @@ public static class NettraceReader
         List<Block<Event>> eventBlocks = [];
         SequencePointBlock? sequencePointBlock = null;
 
-        while (TryStartObject(stream, out var type))
+        while (TryStartObject(buffer, out var maybeType))
         {
-            switch (type!.Name)
+            var (typeLength, type) = maybeType.Value;
+            buffer = buffer[typeLength..];
+            
+            switch (type.Name)
             {
                 case "Trace":
                     traceType = type;
-                    trace = TraceDecoder(stream);
+                    if (!TryDecodeTrace(buffer, out var maybeTrace))
+                        throw new InvalidOperationException($"Failed to decode trace. Buffer: {buffer.Length}");
+                    (var traceLength, trace) = maybeTrace.Value;
+                    buffer = buffer[traceLength..];
                     break;
                 case "MetadataBlock":
                     Debug.Assert(traceType is not null);
-                    var metadataDecoder = BlockDecoder(CreateMetadataEventDecoder(traceType!.Vesrion));
-                    var metadata = metadataDecoder(stream);
-                    metadataBlocks.Add(metadata);
+                    if (!TryRawReadBlock(buffer, type, out var maybeMetadataRawBlock))
+                        throw new InvalidOperationException($"Failed to read raw block. Buffer: {buffer.Length}");
+                    var (metadataRawBlockLength, metadataRawBlock) = maybeMetadataRawBlock.Value;
+                    buffer = buffer[metadataRawBlockLength..];
+                    var metadataBlock = BlockDecoder(metadataRawBlock, MetadataEventDecoder(metadataRawBlock));
+                    metadataBlocks.Add(metadataBlock);
                     break;
                 case "StackBlock":
-                    stack = StackBlockDecoder(stream);
+                    Debug.Assert(traceType is not null);
+                    if (!TryRawReadBlock(buffer, type, out var maybeStackRawBlock))
+                        throw new InvalidOperationException($"Failed to read raw block. Buffer: {buffer.Length}");
+                    var (stackRawBlockLength, stackRawBlock) = maybeStackRawBlock.Value;
+                    buffer = buffer[stackRawBlockLength..];
+                    stack = StackBlockDecoder(stackRawBlock);
                     break;
                 case "EventBlock":
-                    var eventBlockDecoder = BlockDecoder(EventDecoder);
-                    var @event = eventBlockDecoder(stream);
-                    eventBlocks.Add(@event);
+                    Debug.Assert(traceType is not null);
+                    if (!TryRawReadBlock(buffer, type, out var maybeEventRawBlock))
+                        throw new InvalidOperationException($"Failed to read raw block. Buffer: {buffer.Length}");
+                    var (eventRawBlockLength, eventRawBlock) = maybeEventRawBlock.Value;
+                    buffer = buffer[eventRawBlockLength..];
+                    var eventBlock = BlockDecoder(eventRawBlock, EventDecoder);
+                    eventBlocks.Add(eventBlock);
                     break;
                 case "SPBlock":
-                    sequencePointBlock = SequencePointBlockDecoder(stream);
+                    Debug.Assert(traceType is not null);
+                    if (!TryRawReadBlock(buffer, type, out var maybeSpRawBlock))
+                        throw new InvalidOperationException($"Failed to read raw block. Buffer: {buffer.Length}");
+                    var (spRawBlockLength, spRawBlock) = maybeSpRawBlock.Value;
+                    buffer = buffer[spRawBlockLength..];
+                    sequencePointBlock = SequencePointBlockDecoder(spRawBlock);
                     break;
                 default:
                     throw new NotImplementedException($"Unknown object type: {type}");
             }
-            FinishObject(stream);
+            var cursor = 0;
+            FinishObject(buffer, ref cursor);
+            buffer = buffer[cursor..];
         }
 
         return new(
@@ -397,9 +431,9 @@ public static class NettraceReader
 
         return new(rawBlock.Payload.Length, new Header(headerSize, flags, minTimestamp, maxTimestamp, reserved.ToArray()), [.. eventBlobs]);
     }
-
-    private static PayloadDecoder<MetadataEvent> CreateMetadataEventDecoder(int fileVersion)
-        => (in ReadOnlySpan<byte> bytes) => MetadataEventDecoder(in bytes, fileVersion);
+    
+    private static PayloadDecoder<MetadataEvent> MetadataEventDecoder(RawBlock rawBlock)
+        => (in ReadOnlySpan<byte> bytes) => MetadataEventDecoder(in bytes, rawBlock.Type.Vesrion);
 
     private static MetadataEvent MetadataEventDecoder(in ReadOnlySpan<byte> bytes, int fileVersion)
     {
@@ -465,15 +499,9 @@ public static class NettraceReader
     private static byte[] RawEventDecoder(in ReadOnlySpan<byte> bytes)
         => bytes.ToArray();
 
-    private static StackBlock StackBlockDecoder(Stream stream)
+    private static StackBlock StackBlockDecoder(RawBlock block)
     {
-        int blockSize = ReadInt32(stream);
-
-        Align(stream);
-
-        Span<byte> blockBytes = new byte[blockSize];
-        stream.ReadExactly(blockBytes);
-
+        ReadOnlySpan<byte> blockBytes = block.Payload.Span;
         var cursor = 0;
 
         var firstId = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
@@ -485,10 +513,10 @@ public static class NettraceReader
             var stackSize = MemoryMarshal.Read<int>(blockBytes[cursor..MoveBy(ref cursor, 4)]);
             stacks[stackIndex] = new(stackSize, [.. blockBytes[cursor..MoveBy(ref cursor, stackSize)]]);
         }
-        return new(blockSize, firstId, count, stacks);
+        return new(blockBytes.Length, firstId, count, stacks);
     }
 
-    private static SequencePointBlock ReadSequencePointBlockDecoder(RawBlock block)
+    private static SequencePointBlock SequencePointBlockDecoder(RawBlock block)
     {
         ReadOnlySpan<byte> blockBytes = block.Payload.Span;
         
