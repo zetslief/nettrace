@@ -53,19 +53,34 @@ var maybeError = TryReadCollectTracingResponse(responseMemory.AsSpan(0, response
 if (maybeError.HasValue) throw new InvalidOperationException($"Failed to get collect tracing response: {maybeError}");
 Console.WriteLine($"Session Id: {sessionId}");
 
-var state = State.ReadingNewObject;
+var state = State.Magic;
 NettraceReader.Type? currentObject = null;
+
+Memory<byte> nettrace = new byte[1024 * 4];
+var read = await socket.ReceiveAsync(nettrace);
+Console.WriteLine($"Receive {read} bytes");
+int globalCursor = 0;
+bool needMoreMemory = false;
 
 while (true)
 {
-    var nettrace = new byte[1024 * 4];
-    var read = await socket.ReceiveAsync(nettrace);
-    Console.WriteLine($"Receive {read} bytes");
-    Console.WriteLine(Encoding.UTF8.GetString(nettrace.AsSpan(..read)));
-
-    using var stream = new MemoryStream(nettrace[8..read]);
+    if (needMoreMemory) throw new InvalidOperationException("Need more memory. This operation is not implemented yet.");
     switch (state)
     {
+        case State.Magic:
+            var magic = Encoding.UTF8.GetString(nettrace[..8].Span);
+            MoveBy(ref globalCursor, 8); 
+            Console.WriteLine($"Magic: {magic}");
+            state = State.StreamHeader;
+            break;
+        case State.StreamHeader:
+            if (!NettraceReader.TryReadStreamHeader(nettrace.Span[globalCursor..], out var maybeStreamHeader))
+                break;
+            var (streamHeaderLength, streamHeader) = maybeStreamHeader.Value;
+            Console.WriteLine($"Stream Header: {streamHeader}");
+            globalCursor += streamHeaderLength;
+            state = State.NewObject;
+            break;
         default:
             throw new NotImplementedException($"{state} is not implemented");
     }
@@ -164,6 +179,9 @@ enum IpcError : uint
 
 enum State
 {
-    ReadingNewObject,
+    Magic,
+    StreamHeader,
+    NewObject,
     PayloadParsing,
+    FinishObject,
 }

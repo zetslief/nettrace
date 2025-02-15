@@ -137,10 +137,8 @@ public static class NettraceReader
 
         ReadOnlySpan<byte> magic = buffer[..MoveBy(ref globalCursor, 8)];
 
-        if (!TryReadString(buffer[globalCursor..], out var maybeStreamHeader))
-        {
+        if (!TryReadStreamHeader(buffer[globalCursor..], out var maybeStreamHeader))
             throw new InvalidOperationException($"Failed to read string header.");
-        }
 
         var (streamHeaderLength, streamHeader) = maybeStreamHeader.Value;
         globalCursor += streamHeaderLength;
@@ -217,6 +215,9 @@ public static class NettraceReader
             stack ?? throw new InvalidOperationException("File doesn't contain stack."),
             sequencePointBlock ?? throw new InvalidOperationException("File dosn't contain SPB."));
     }
+
+    public static bool TryReadStreamHeader(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out (int, string)? result)
+        => TryReadString(buffer[..], out result);
 
     public static bool TryStartObject(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out (int, Type)? result)
     {
