@@ -252,33 +252,6 @@ public static class NettraceReader
         var _endObject = ReadTag(stream[MoveBy(ref cursor, sizeof(byte))]);
     }
 
-    private static bool TryReadObject<T>(ReadOnlySpan<byte> stream, ObjectDecoder<T> payloadDecoder, [NotNullWhen(true)] out (int, Object<T>)? result)
-    {
-        int cursor = 0;
-        
-        var beginPrivateObject = ReadTag(stream[MoveBy(ref cursor, sizeof(byte))]);
-
-        if (!TryReadType(stream, ref cursor, out var maybeType))
-        {
-            result = null;
-            return false;
-        }
-
-        if (!payloadDecoder(stream[cursor..], out var maybePayload))
-        {
-            result = null;
-            return false;
-        }
-        
-        var (payloadByteLength, payload) = maybePayload;
-        MoveBy(ref cursor, payloadByteLength);
-
-        var endObject = ReadTag(stream[MoveBy(ref cursor, sizeof(byte))]);
-
-        result = (cursor, new(maybeType, payload));
-        return false;
-    }
-
     private static bool TryReadType(ReadOnlySpan<byte> data, ref int cursor, [NotNullWhen(true)] out Type? type)
     {
         if (data.Length < cursor + 11)
