@@ -130,14 +130,15 @@ public static class NettraceReader
 
     public static NettraceFile Read(Stream stream)
     {
-        Span<byte> magic = stackalloc byte[8];
-        stream.ReadExactly(magic);
+        Memory<byte> memory = new byte[stream.Length];
+        stream.ReadExactly(memory.Span);
         
-        Span<byte> buffer = new byte[stream.Length - 8];
-        stream.ReadExactly(buffer);
-        int globalCursor = 8;
+        int globalCursor = 0;
+        ReadOnlySpan<byte> buffer = memory.Span;
+        
+        ReadOnlySpan<byte> magic = buffer[..MoveBy(ref globalCursor, 8)];
 
-        if (!TryReadString(buffer, out var maybeStreamHeader))
+        if (!TryReadString(buffer[globalCursor..], out var maybeStreamHeader))
         {
             throw new InvalidOperationException($"Failed to read string header.");
         }
@@ -152,7 +153,7 @@ public static class NettraceReader
         List<Block<Event>> eventBlocks = [];
         SequencePointBlock? sequencePointBlock = null;
 
-        while (TryStartObject(buffer[globalCursor..], out var maybeType))
+        while (globalCursor < buffer.Length && TryStartObject(buffer[globalCursor..], out var maybeType))
         {
             var (typeLength, type) = maybeType.Value;
             globalCursor += typeLength;
@@ -227,7 +228,7 @@ public static class NettraceReader
         
         int cursor = 0;
 
-        var tag = ReadTag(stream[MoveBy(ref cursor, sizeof(byte))]);
+        var tag = ReadTag(stream[cursor++]);
         if (tag == Tag.BeginPrivateObject)
         {
             if (!TryReadType(stream, ref cursor, out var maybeType))
@@ -249,7 +250,7 @@ public static class NettraceReader
 
     private static void FinishObject(ReadOnlySpan<byte> stream, ref int cursor)
     {
-        var _endObject = ReadTag(stream[MoveBy(ref cursor, sizeof(byte))]);
+        var _endObject = ReadTag(stream[cursor++]);
     }
 
     private static bool TryReadType(ReadOnlySpan<byte> data, ref int cursor, [NotNullWhen(true)] out Type? type)
@@ -260,9 +261,9 @@ public static class NettraceReader
             return false;
         }
 
-        var beginPrivateObject = ReadTag(data[MoveBy(ref cursor, sizeof(byte))]);
+        var beginPrivateObject = ReadTag(data[cursor++]);
 
-        var tag = ReadTag(data[MoveBy(ref cursor, sizeof(byte))]);
+        var tag = ReadTag(data[cursor++]);
         var version = ReadInt32(data[cursor..MoveBy(ref cursor, sizeof(int))]);
         var minimumReaderVersion = ReadInt32(data[cursor..MoveBy(ref cursor, sizeof(int))]);
         if (!TryReadString(data[cursor..], out var maybeName))
@@ -274,7 +275,7 @@ public static class NettraceReader
         var (nameByteLength, name) = maybeName.Value;
         MoveBy(ref cursor, nameByteLength);
 
-        var endObject = ReadTag(data[MoveBy(ref cursor, sizeof(byte))]);
+        var endObject = ReadTag(data[cursor++]);
 
         type = new(tag, name, version, minimumReaderVersion);
         return true;
@@ -336,7 +337,8 @@ public static class NettraceReader
             return false;
         }
 
-        // TODO: Align(stream);
+        var alignLength = Align(globalCursor);
+        cursor += alignLength;
         Memory<byte> buffer = new byte[blockSize];
         data[cursor..MoveBy(ref cursor, blockSize)].CopyTo(buffer.Span);
         result = (cursor, new(type, globalCursor + cursor - blockSize, buffer));
@@ -526,11 +528,8 @@ public static class NettraceReader
         return value;
     }
 
-    private static void Align(Stream stream)
-    {
-        var padding = (4 - stream.Position % 4) % 4;
-        stream.Seek(padding, SeekOrigin.Current);
-    }
+    private static int Align(int cursor)
+        => (4 - cursor % 4) % 4;
 
     private static Tag ReadTag(byte data) => (Tag)data;
 
@@ -570,15 +569,6 @@ public static class NettraceReader
 
     private static long ReadInt64(ReadOnlySpan<byte> data)
         => MemoryMarshal.Read<long>(data);
-
-    private static void PrintBytes(ReadOnlySpan<byte> bytes)
-    {
-        foreach (var @byte in bytes[..^1])
-        {
-            Console.Write($"{@byte:D} ");
-        }
-        Console.WriteLine($"{bytes[^1]:D}");
-    }
 
     private static int ReadVarInt32(ReadOnlySpan<byte> bytes, ref int cursor)
     {
