@@ -59,7 +59,8 @@ Console.WriteLine($"Session Id: {sessionId}");
 var state = State.Magic;
 NettraceReader.Type? currentObject = null;
 
-Memory<byte> nettrace = new byte[1024 * 8];
+Memory<byte> nettrace = new byte[1024 * 1024 * 32];
+int bufferCursor = 0;
 int globalCursor = 0;
 int bufferEnd = 0;
 bool needMoreMemory = true;
@@ -80,50 +81,55 @@ while (true)
             bufferEnd += read;
             if (bufferEnd == nettrace.Length)
             {
-                var newNettrace = new byte[nettrace.Length * 2];
-                nettrace.CopyTo(newNettrace);
+                var newNettrace = new byte[nettrace.Length];
+                nettrace[bufferCursor..].CopyTo(newNettrace);
+                bufferEnd -= bufferCursor; 
+                bufferCursor = 0;
                 nettrace = newNettrace;
             }
 
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine($"Parsing - Receive {read} bytes. Time to read - {stopwatch.ElapsedMilliseconds} ms");
             Console.WriteLine($"Buffer Length - {nettrace.Length} ({nettrace.Length / 1e6d} Mb)");
-            Console.WriteLine($"Global Cursor - {globalCursor} | Buffer End  - {bufferEnd} | Space Taken: {bufferEnd - globalCursor} ({(bufferEnd / (float)nettrace.Length) * 100:F2}%)");
+            var spaceTaken = bufferEnd - bufferCursor;
+            Console.WriteLine($"Global Cursor - {bufferCursor} | Buffer End  - {bufferEnd} | Space Taken: {spaceTaken} ({(spaceTaken / (float)nettrace.Length) * 100:F2}%)");
             Console.ResetColor();
             stopwatch.Reset();
         }
 
         needMoreMemory = false;
     }
+    
+    var bufferCursorStart = bufferCursor;
 
     switch (state)
     {
         case State.Magic:
             var magic = Encoding.UTF8.GetString(nettrace[..8].Span);
-            MoveBy(ref globalCursor, 8); 
+            MoveBy(ref bufferCursor, 8); 
             Console.WriteLine($"Magic: {magic}");
             state = State.StreamHeader;
             break;
         case State.StreamHeader:
-            if (!NettraceReader.TryReadStreamHeader(nettrace.Span[globalCursor..bufferEnd], out var maybeStreamHeader))
+            if (!NettraceReader.TryReadStreamHeader(nettrace.Span[bufferCursor..bufferEnd], out var maybeStreamHeader))
             {
                 needMoreMemory = true;
                 break;
             }
             var (streamHeaderLength, streamHeader) = maybeStreamHeader.Value;
             Console.WriteLine($"Stream Header: {streamHeader}");
-            globalCursor += streamHeaderLength;
+            bufferCursor += streamHeaderLength;
             state = State.StartObject;
             break;
         case State.StartObject:
-            if (!NettraceReader.TryStartObject(nettrace.Span[globalCursor..bufferEnd], out var maybeNewObject))
+            if (!NettraceReader.TryStartObject(nettrace.Span[bufferCursor..bufferEnd], out var maybeNewObject))
             {
                 needMoreMemory = true;
                 break;
             }
             var (newObjectLength, newObject) = maybeNewObject.Value;
             Console.WriteLine($"New object: {newObject}");
-            globalCursor += newObjectLength;
+            bufferCursor += newObjectLength;
             currentObject = newObject;
             state = State.NewObject;
             break;
@@ -132,7 +138,7 @@ while (true)
             switch (currentObject.Name)
             {
                 case "Trace":
-                    if (!NettraceReader.TryReadTrace(nettrace.Span[globalCursor..bufferEnd], out var maybeTrace))
+                    if (!NettraceReader.TryReadTrace(nettrace.Span[bufferCursor..bufferEnd], out var maybeTrace))
                     {
                         needMoreMemory = true;
                         break;
@@ -140,11 +146,11 @@ while (true)
                     
                     var (traceLength, trace) = maybeTrace.Value;
                     Console.WriteLine($"Trace: {trace}");
-                    globalCursor += traceLength;
+                    bufferCursor += traceLength;
                     state = State.FinishObject;
                     break;
                 case var blockish when blockish.EndsWith("Block"):
-                    if (!NettraceReader.TryReadRawBlock(nettrace.Span[globalCursor..bufferEnd], currentObject, globalCursor, out var maybeRawBlock))
+                    if (!NettraceReader.TryReadRawBlock(nettrace.Span[bufferCursor..bufferEnd], currentObject, globalCursor, out var maybeRawBlock))
                     {
                         needMoreMemory = true;
                         break;
@@ -152,7 +158,7 @@ while (true)
 
                     var (rawBlockLength, rawBlock) = maybeRawBlock.Value;
                     Console.WriteLine($"\tRaw Block: {rawBlock}");
-                    globalCursor += rawBlockLength;
+                    bufferCursor += rawBlockLength;
                     state = State.FinishObject;
                     break;
                 default:
@@ -160,13 +166,13 @@ while (true)
             }
             break;
         case State.FinishObject:
-            if (!NettraceReader.TryFinishObject(nettrace.Span[globalCursor..bufferEnd], out var finishObjectLength))
+            if (!NettraceReader.TryFinishObject(nettrace.Span[bufferCursor..bufferEnd], out var finishObjectLength))
             {
                 needMoreMemory = true;
                 break;
             }
             
-            globalCursor += finishObjectLength.Value;
+            bufferCursor += finishObjectLength.Value;
             Console.WriteLine($"Finish current object: {currentObject}.");
             currentObject = null;
             state = State.StartObject;
@@ -174,6 +180,10 @@ while (true)
         default:
             throw new NotImplementedException($"{state} is not implemented");
     }
+    
+    var bufferCursorMoved = bufferCursor - bufferCursorStart; 
+    globalCursor += bufferCursorMoved;
+    needMoreMemory = needMoreMemory || ((bufferEnd - bufferCursor) / (float)nettrace.Length) < 0.1f;
 }
 
 static ReadOnlyMemory<byte>? TryCollectTracingCommand(IReadOnlyCollection<Provider> providers)
@@ -206,7 +216,7 @@ static ReadOnlyMemory<byte>? TryCollectTracingCommand(IReadOnlyCollection<Provid
 
     var cursor = 20;
 
-    uint circularBufferMb = 1000;
+    uint circularBufferMb = 128;
     if (!BinaryPrimitives.TryWriteUInt32LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(uint))], circularBufferMb))
         return null;
 
