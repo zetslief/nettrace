@@ -85,6 +85,23 @@ while (true)
     (needMoreMemory, parsingCtx, bufferCtx) = ParseNettrace(in parsingCtx, in bufferCtx, nettrace);
 }
 
+(var read, bufferCtx) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
+while (read > 0)
+{
+    WriteBufferContextInfo(in bufferCtx, nettrace, read);
+    (read, bufferCtx) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
+}
+
+while (!needMoreMemory)
+{
+    (needMoreMemory, parsingCtx, bufferCtx) = ParseNettrace(in parsingCtx, in bufferCtx, nettrace);
+}
+
+WriteBufferContextInfo(in bufferCtx, nettrace, read);
+BinaryPrimitives.TryReadUInt64LittleEndian(nettrace.Span[^sizeof(ulong)..], out var sessionIdAfterStop);
+Console.WriteLine($"SessionId: {sessionIdAfterStop}");
+Debug.Assert(bufferCtx.BufferEnd - bufferCtx.BufferCursor == 24);
+
 static async Task<(int TotalRead, BufferContext BufferCtx)> ReadDataFromSocket(Socket socket, BufferContext bufferCtx, Memory<byte> nettrace)
 {
     var requestStopwatch = new Stopwatch();
@@ -122,7 +139,7 @@ static void WriteBufferContextInfo(in BufferContext ctx, ReadOnlyMemory<byte> ne
     Console.WriteLine($"Parsing - Receive {read} bytes.");
     Console.WriteLine($"Buffer Length - {nettrace.Length} ({nettrace.Length / 1e6d} Mb)");
     var spaceTaken = ctx.BufferEnd - ctx.BufferCursor;
-    Console.WriteLine($"Global Cursor - {ctx.BufferCursor} | Buffer End  - {ctx.BufferEnd} | Space Taken: {spaceTaken} ({(spaceTaken / (float)nettrace.Length) * 100:F2}%)");
+    Console.WriteLine($"Buffer Cursor - {ctx.BufferCursor} | Buffer End  - {ctx.BufferEnd} | Space Taken: {spaceTaken} ({(spaceTaken / (float)nettrace.Length) * 100:F2}%)");
     Console.ResetColor();
 }
 
