@@ -80,7 +80,6 @@ while (true)
     {
         (var totalRead, bufferCtx) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
         WriteBufferContextInfo(in bufferCtx, nettrace, totalRead);
-        needMoreMemory = false;
     }
     
     (needMoreMemory, parsingCtx, bufferCtx) = ParseNettrace(in parsingCtx, in bufferCtx, nettrace);
