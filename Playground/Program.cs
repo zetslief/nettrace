@@ -78,25 +78,30 @@ while (true)
     
     if (needMoreMemory)
     {
-        bufferCtx = await ReadDataFromSocket(socket, bufferCtx, nettrace);
+        (var totalRead, bufferCtx) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
+        WriteBufferContextInfo(in bufferCtx, nettrace, totalRead);
         needMoreMemory = false;
     }
     
     (needMoreMemory, parsingCtx, bufferCtx) = ParseNettrace(in parsingCtx, in bufferCtx, nettrace);
 }
 
-static async Task<BufferContext> ReadDataFromSocket(Socket socket, BufferContext bufferCtx, Memory<byte> nettrace)
+static async Task<(int TotalRead, BufferContext BufferCtx)> ReadDataFromSocket(Socket socket, BufferContext bufferCtx, Memory<byte> nettrace)
 {
     var requestStopwatch = new Stopwatch();
     long timeToRead = 0;
+    int totalRead = 0;
     var (bufferCursor, bufferEnd) = bufferCtx;
     for (int attempt = 0; attempt < 100 && timeToRead < 100; ++attempt)
     {
         requestStopwatch.Start();
         var read = await socket.ReceiveAsync(nettrace[bufferEnd..]);
+        if (read == 0) 
+            break;
         requestStopwatch.Stop();
         timeToRead = requestStopwatch.ElapsedMilliseconds;
         bufferEnd += read;
+        totalRead += read;
         if (bufferEnd == nettrace.Length)
         {
             var newNettrace = new byte[nettrace.Length];
@@ -106,16 +111,20 @@ static async Task<BufferContext> ReadDataFromSocket(Socket socket, BufferContext
             nettrace = newNettrace;
         }
 
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine($"Parsing - Receive {read} bytes. Time to read - {requestStopwatch.ElapsedMilliseconds} ms");
-        Console.WriteLine($"Buffer Length - {nettrace.Length} ({nettrace.Length / 1e6d} Mb)");
-        var spaceTaken = bufferEnd - bufferCursor;
-        Console.WriteLine($"Global Cursor - {bufferCursor} | Buffer End  - {bufferEnd} | Space Taken: {spaceTaken} ({(spaceTaken / (float)nettrace.Length) * 100:F2}%)");
-        Console.ResetColor();
         requestStopwatch.Reset();
     }
     
-    return new(bufferCursor, bufferEnd);
+    return (totalRead, new(bufferCursor, bufferEnd));
+}
+
+static void WriteBufferContextInfo(in BufferContext ctx, ReadOnlyMemory<byte> nettrace, int read)
+{
+    Console.ForegroundColor = ConsoleColor.Green;
+    Console.WriteLine($"Parsing - Receive {read} bytes.");
+    Console.WriteLine($"Buffer Length - {nettrace.Length} ({nettrace.Length / 1e6d} Mb)");
+    var spaceTaken = ctx.BufferEnd - ctx.BufferCursor;
+    Console.WriteLine($"Global Cursor - {ctx.BufferCursor} | Buffer End  - {ctx.BufferEnd} | Space Taken: {spaceTaken} ({(spaceTaken / (float)nettrace.Length) * 100:F2}%)");
+    Console.ResetColor();
 }
 
 static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx) ParseNettrace(
