@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Sockets;
 using System.Text;
 using System.Buffers.Binary;
@@ -54,55 +55,80 @@ var responseLength = await socket.ReceiveAsync(responseMemory);
 Console.WriteLine($"Read {responseLength} data.");
 var maybeError = TryReadCollectTracingResponse(responseMemory.AsSpan(0, responseLength), out var sessionId);
 if (maybeError.HasValue) throw new InvalidOperationException($"Failed to get collect tracing response: {maybeError}");
+Debug.Assert(sessionId is not null);
 Console.WriteLine($"Session Id: {sessionId}");
 
-var state = State.Magic;
-NettraceReader.Type? currentObject = null;
-
 Memory<byte> nettrace = new byte[1024 * 1024 * 32];
-int bufferCursor = 0;
-int globalCursor = 0;
-int bufferEnd = 0;
+BufferContext bufferCtx = new(0, 0);
+ParsingContext parsingCtx = new(0, null, State.Magic);
 bool needMoreMemory = true;
 
-var stopwatch = new Stopwatch();
+var sessionStopwatch = Stopwatch.StartNew();
 
 while (true)
 {
+    if (sessionStopwatch.Elapsed > TimeSpan.FromSeconds(10))
+    {
+        var maybeStopTracingCommandBuffer = TryStopTracing(sessionId.Value);
+        if (maybeStopTracingCommandBuffer is null) throw new InvalidOperationException("Failed to create stop tracing command buffer"); 
+        var stopTracingWritten = await socket.SendAsync(maybeStopTracingCommandBuffer.Value); 
+        Debug.Assert(stopTracingWritten == maybeStopTracingCommandBuffer.Value.Length);
+        break;
+    }
+    
     if (needMoreMemory)
     {
-        long timeToRead = 0;
-        for (int attempt = 0; attempt < 100 && timeToRead < 100; ++attempt)
-        {
-            stopwatch.Start();
-            var read = await socket.ReceiveAsync(nettrace[bufferEnd..]);
-            stopwatch.Stop();
-            timeToRead = stopwatch.ElapsedMilliseconds;
-            bufferEnd += read;
-            if (bufferEnd == nettrace.Length)
-            {
-                var newNettrace = new byte[nettrace.Length];
-                nettrace[bufferCursor..].CopyTo(newNettrace);
-                bufferEnd -= bufferCursor; 
-                bufferCursor = 0;
-                nettrace = newNettrace;
-            }
-
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"Parsing - Receive {read} bytes. Time to read - {stopwatch.ElapsedMilliseconds} ms");
-            Console.WriteLine($"Buffer Length - {nettrace.Length} ({nettrace.Length / 1e6d} Mb)");
-            var spaceTaken = bufferEnd - bufferCursor;
-            Console.WriteLine($"Global Cursor - {bufferCursor} | Buffer End  - {bufferEnd} | Space Taken: {spaceTaken} ({(spaceTaken / (float)nettrace.Length) * 100:F2}%)");
-            Console.ResetColor();
-            stopwatch.Reset();
-        }
-
+        bufferCtx = await ReadDataFromSocket(socket, bufferCtx, nettrace);
         needMoreMemory = false;
     }
     
-    var bufferCursorStart = bufferCursor;
+    (needMoreMemory, parsingCtx, bufferCtx) = ParseNettrace(in parsingCtx, in bufferCtx, nettrace);
+}
 
-    switch (state)
+static async Task<BufferContext> ReadDataFromSocket(Socket socket, BufferContext bufferCtx, Memory<byte> nettrace)
+{
+    var requestStopwatch = new Stopwatch();
+    long timeToRead = 0;
+    var (bufferCursor, bufferEnd) = bufferCtx;
+    for (int attempt = 0; attempt < 100 && timeToRead < 100; ++attempt)
+    {
+        requestStopwatch.Start();
+        var read = await socket.ReceiveAsync(nettrace[bufferEnd..]);
+        requestStopwatch.Stop();
+        timeToRead = requestStopwatch.ElapsedMilliseconds;
+        bufferEnd += read;
+        if (bufferEnd == nettrace.Length)
+        {
+            var newNettrace = new byte[nettrace.Length];
+            nettrace[bufferCursor..].CopyTo(newNettrace);
+            bufferEnd -= bufferCursor; 
+            bufferCursor = 0;
+            nettrace = newNettrace;
+        }
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"Parsing - Receive {read} bytes. Time to read - {requestStopwatch.ElapsedMilliseconds} ms");
+        Console.WriteLine($"Buffer Length - {nettrace.Length} ({nettrace.Length / 1e6d} Mb)");
+        var spaceTaken = bufferEnd - bufferCursor;
+        Console.WriteLine($"Global Cursor - {bufferCursor} | Buffer End  - {bufferEnd} | Space Taken: {spaceTaken} ({(spaceTaken / (float)nettrace.Length) * 100:F2}%)");
+        Console.ResetColor();
+        requestStopwatch.Reset();
+    }
+    
+    return new(bufferCursor, bufferEnd);
+}
+
+static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx) ParseNettrace(
+    in ParsingContext ctx,
+    in BufferContext bufferContext,
+    ReadOnlyMemory<byte> nettrace)
+{
+    var (globalCursor, currentObject, state) = ctx;
+    var (bufferCursor, bufferEnd) = bufferContext;
+    var bufferCursorStart = bufferCursor;
+    var needMoreMemory = false;
+
+    switch (ctx.State)
     {
         case State.Magic:
             var magic = Encoding.UTF8.GetString(nettrace[..8].Span);
@@ -183,7 +209,7 @@ while (true)
     
     var bufferCursorMoved = bufferCursor - bufferCursorStart; 
     globalCursor += bufferCursorMoved;
-    needMoreMemory = needMoreMemory || ((bufferEnd - bufferCursor) / (float)nettrace.Length) < 0.1f;
+    return (needMoreMemory, new(globalCursor, currentObject, state), new(bufferCursor, bufferEnd));
 }
 
 static ReadOnlyMemory<byte>? TryCollectTracingCommand(IReadOnlyCollection<Provider> providers)
@@ -241,10 +267,10 @@ static ReadOnlyMemory<byte>? TryCollectTracingCommand(IReadOnlyCollection<Provid
     if (!BinaryPrimitives.TryWriteUInt16LittleEndian(buffer[sizeIndex..WithOffset(sizeIndex, 2)], (ushort)cursor))
         return null;
 
-    return data;
+    return data[..cursor];
 }
 
-static IpcError? TryReadCollectTracingResponse(ReadOnlySpan<byte> data, out ulong? sessionId)
+static IpcError? TryReadCollectTracingResponse(ReadOnlySpan<byte> data, [NotNullWhen(true)] out ulong? sessionId)
 {
     switch (data.Length)
     {
@@ -258,6 +284,34 @@ static IpcError? TryReadCollectTracingResponse(ReadOnlySpan<byte> data, out ulon
             sessionId = uint.MaxValue;
             return IpcError.UnknownError;
     }
+}
+
+static ReadOnlyMemory<byte>? TryStopTracing(ulong sessionId)
+{
+    Memory<byte> data = new byte[HEADER_SIZE + sizeof(ulong)];
+    var buffer = data.Span;
+
+    var magic = "DOTNET_IPC_V1"u8.ToArray();
+    magic.CopyTo(buffer);
+
+    byte eventPipeCommandSet = 0x02;
+    byte collectTracingCommandId = 0x01;
+    int eventPipeCommandSetIndex = 16;
+    int collectTracingCommandIdIndex = 17;
+
+    buffer[eventPipeCommandSetIndex] = eventPipeCommandSet;
+    buffer[collectTracingCommandIdIndex] = collectTracingCommandId;
+
+    var cursor = HEADER_SIZE;
+
+    if (!BinaryPrimitives.TryWriteUInt64LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(ulong))], sessionId))
+        return null;
+    
+    var sizeIndex = 14;
+    if (!BinaryPrimitives.TryWriteUInt16LittleEndian(buffer[sizeIndex..WithOffset(sizeIndex, 2)], (ushort)cursor))
+        return null;
+    
+    return data[..cursor];
 }
 
 static int MoveBy(ref int cursor, int value)
@@ -286,3 +340,11 @@ enum State
     NewObject,
     FinishObject,
 }
+
+readonly record struct BufferContext(int BufferCursor, int BufferEnd);
+
+readonly record struct ParsingContext(
+    int GlobalCursor,
+    NettraceReader.Type? CurrentObject,
+    State State
+);
