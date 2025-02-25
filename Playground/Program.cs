@@ -28,11 +28,17 @@ Console.WriteLine($"File: {file}");
 
 using CancellationTokenSource cts = new();
 using Socket socket = new(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+using Socket stopSocket = new(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
 var endpoint = new UnixDomainSocketEndPoint(file);
+var endpoint2 = new UnixDomainSocketEndPoint(file);
 
+Console.WriteLine($"Connecting main socket...");
 await socket.ConnectAsync(endpoint, cts.Token);
+Console.WriteLine($"Connecting stop socket...");
+await stopSocket.ConnectAsync(endpoint2, cts.Token);
 
 Console.WriteLine($"Connected? {socket.Connected}");
+await Task.Delay(5000);
 
 IReadOnlyCollection<Provider> providers =
 [
@@ -58,7 +64,7 @@ if (maybeError.HasValue) throw new InvalidOperationException($"Failed to get col
 Debug.Assert(sessionId is not null);
 Console.WriteLine($"Session Id: {sessionId}");
 
-Memory<byte> nettrace = new byte[1024 * 1024 * 32];
+Memory<byte> nettrace = new byte[1024 * 1024 * 128];
 BufferContext bufferCtx = new(0, 0);
 ParsingContext parsingCtx = new(0, null, State.Magic);
 bool needMoreMemory = true;
@@ -67,11 +73,13 @@ var sessionStopwatch = Stopwatch.StartNew();
 
 while (true)
 {
-    if (sessionStopwatch.Elapsed > TimeSpan.FromSeconds(10))
+    if (sessionStopwatch.Elapsed > TimeSpan.FromSeconds(5))
     {
         var maybeStopTracingCommandBuffer = TryStopTracing(sessionId.Value);
         if (maybeStopTracingCommandBuffer is null) throw new InvalidOperationException("Failed to create stop tracing command buffer"); 
-        var stopTracingWritten = await socket.SendAsync(maybeStopTracingCommandBuffer.Value); 
+        Console.WriteLine("Sending stop command...");
+        var stopTracingWritten = await stopSocket.SendAsync(maybeStopTracingCommandBuffer.Value); 
+        Console.WriteLine("Stop command sent!");
         Debug.Assert(stopTracingWritten == maybeStopTracingCommandBuffer.Value.Length);
         break;
     }
@@ -92,15 +100,20 @@ while (read > 0)
     (read, bufferCtx) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
 }
 
+Console.WriteLine("Parsing the rest of data...");
 while (!needMoreMemory)
 {
+    WriteBufferContextInfo(in bufferCtx, nettrace, 0);
     (needMoreMemory, parsingCtx, bufferCtx) = ParseNettrace(in parsingCtx, in bufferCtx, nettrace);
 }
 
-WriteBufferContextInfo(in bufferCtx, nettrace, read);
-BinaryPrimitives.TryReadUInt64LittleEndian(nettrace.Span[^sizeof(ulong)..], out var sessionIdAfterStop);
-Console.WriteLine($"SessionId: {sessionIdAfterStop}");
-Debug.Assert(bufferCtx.BufferEnd - bufferCtx.BufferCursor == 24);
+WriteBufferContextInfo(in bufferCtx, nettrace, 0);
+
+Memory<byte> stopResultBuffer = new byte[HEADER_SIZE + sizeof(ulong)];
+var stopRead = await stopSocket.ReceiveAsync(stopResultBuffer);
+Console.WriteLine($"Read {stopRead} bytes from stop socket.");
+BinaryPrimitives.TryReadUInt64LittleEndian(stopResultBuffer.Span[^sizeof(ulong)..], out var sessionIdAfterStop);
+Console.WriteLine($"SessionId: {sessionIdAfterStop} {sessionId}");
 
 static async Task<(int TotalRead, BufferContext BufferCtx)> ReadDataFromSocket(Socket socket, BufferContext bufferCtx, Memory<byte> nettrace)
 {
@@ -231,7 +244,9 @@ static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx)
         default:
             throw new NotImplementedException($"{state} is not implemented");
     }
-    
+
+    if (needMoreMemory) return (true, ctx, bufferContext);
+
     var bufferCursorMoved = bufferCursor - bufferCursorStart; 
     globalCursor += bufferCursorMoved;
     return (needMoreMemory, new(globalCursor, currentObject, state), new(bufferCursor, bufferEnd));

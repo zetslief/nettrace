@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics.Tracing;
 
-var delay = TimeSpan.FromMilliseconds(10);
+var delay = TimeSpan.FromMilliseconds(1000);
 int index = 0;
 
 while (true)
