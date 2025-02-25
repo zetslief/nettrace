@@ -34,11 +34,11 @@ var endpoint2 = new UnixDomainSocketEndPoint(file);
 
 Console.WriteLine($"Connecting main socket...");
 await socket.ConnectAsync(endpoint, cts.Token);
+
 Console.WriteLine($"Connecting stop socket...");
 await stopSocket.ConnectAsync(endpoint2, cts.Token);
 
 Console.WriteLine($"Connected? {socket.Connected}");
-await Task.Delay(5000);
 
 IReadOnlyCollection<Provider> providers =
 [
@@ -64,7 +64,7 @@ if (maybeError.HasValue) throw new InvalidOperationException($"Failed to get col
 Debug.Assert(sessionId is not null);
 Console.WriteLine($"Session Id: {sessionId}");
 
-Memory<byte> nettrace = new byte[1024 * 1024 * 128];
+Memory<byte> nettrace = new byte[1024 * 1024 * 32];
 BufferContext bufferCtx = new(0, 0);
 ParsingContext parsingCtx = new(0, null, State.Magic);
 bool needMoreMemory = true;
@@ -73,7 +73,7 @@ var sessionStopwatch = Stopwatch.StartNew();
 
 while (true)
 {
-    if (sessionStopwatch.Elapsed > TimeSpan.FromSeconds(5))
+    if (sessionStopwatch.Elapsed > TimeSpan.FromSeconds(60))
     {
         var maybeStopTracingCommandBuffer = TryStopTracing(sessionId.Value);
         if (maybeStopTracingCommandBuffer is null) throw new InvalidOperationException("Failed to create stop tracing command buffer"); 
