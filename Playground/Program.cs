@@ -86,18 +86,18 @@ while (true)
     
     if (needMoreMemory)
     {
-        (var totalRead, bufferCtx) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
+        (var totalRead, bufferCtx, nettrace) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
         WriteBufferContextInfo(in bufferCtx, nettrace, totalRead);
     }
     
     (needMoreMemory, parsingCtx, bufferCtx) = ParseNettrace(in parsingCtx, in bufferCtx, nettrace);
 }
 
-(var read, bufferCtx) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
+(var read, bufferCtx, nettrace) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
 while (read > 0)
 {
     WriteBufferContextInfo(in bufferCtx, nettrace, read);
-    (read, bufferCtx) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
+    (read, bufferCtx, nettrace) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
 }
 
 Console.WriteLine("Parsing the rest of data...");
@@ -115,7 +115,7 @@ Console.WriteLine($"Read {stopRead} bytes from stop socket.");
 BinaryPrimitives.TryReadUInt64LittleEndian(stopResultBuffer.Span[^sizeof(ulong)..], out var sessionIdAfterStop);
 Console.WriteLine($"SessionId: {sessionIdAfterStop} {sessionId}");
 
-static async Task<(int TotalRead, BufferContext BufferCtx)> ReadDataFromSocket(Socket socket, BufferContext bufferCtx, Memory<byte> nettrace)
+static async Task<(int TotalRead, BufferContext BufferCtx, Memory<byte> Buffer)> ReadDataFromSocket(Socket socket, BufferContext bufferCtx, Memory<byte> nettrace)
 {
     var requestStopwatch = new Stopwatch();
     long timeToRead = 0;
@@ -126,7 +126,7 @@ static async Task<(int TotalRead, BufferContext BufferCtx)> ReadDataFromSocket(S
         requestStopwatch.Start();
         var read = await socket.ReceiveAsync(nettrace[bufferEnd..]);
         if (read == 0) 
-            break;
+            break; // TODO: (this break is not safe, refactor it. there might be some edge case.)
         requestStopwatch.Stop();
         timeToRead = requestStopwatch.ElapsedMilliseconds;
         bufferEnd += read;
@@ -143,7 +143,7 @@ static async Task<(int TotalRead, BufferContext BufferCtx)> ReadDataFromSocket(S
         requestStopwatch.Reset();
     }
     
-    return (totalRead, new(bufferCursor, bufferEnd));
+    return (totalRead, new(bufferCursor, bufferEnd), nettrace);
 }
 
 static void WriteBufferContextInfo(in BufferContext ctx, ReadOnlyMemory<byte> nettrace, int read)
@@ -165,6 +165,8 @@ static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx)
     var (bufferCursor, bufferEnd) = bufferContext;
     var bufferCursorStart = bufferCursor;
     var needMoreMemory = false;
+    
+    var span = nettrace.Span[bufferCursor..bufferEnd];
 
     switch (ctx.State)
     {
@@ -175,7 +177,7 @@ static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx)
             state = State.StreamHeader;
             break;
         case State.StreamHeader:
-            if (!NettraceReader.TryReadStreamHeader(nettrace.Span[bufferCursor..bufferEnd], out var maybeStreamHeader))
+            if (!NettraceReader.TryReadStreamHeader(span, out var maybeStreamHeader))
             {
                 needMoreMemory = true;
                 break;
@@ -186,7 +188,7 @@ static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx)
             state = State.StartObject;
             break;
         case State.StartObject:
-            if (!NettraceReader.TryStartObject(nettrace.Span[bufferCursor..bufferEnd], out var maybeNewObject))
+            if (!NettraceReader.TryStartObject(span, out var maybeNewObject))
             {
                 needMoreMemory = true;
                 break;
@@ -202,7 +204,7 @@ static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx)
             switch (currentObject.Name)
             {
                 case "Trace":
-                    if (!NettraceReader.TryReadTrace(nettrace.Span[bufferCursor..bufferEnd], out var maybeTrace))
+                    if (!NettraceReader.TryReadTrace(span, out var maybeTrace))
                     {
                         needMoreMemory = true;
                         break;
@@ -214,7 +216,7 @@ static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx)
                     state = State.FinishObject;
                     break;
                 case var blockish when blockish.EndsWith("Block"):
-                    if (!NettraceReader.TryReadRawBlock(nettrace.Span[bufferCursor..bufferEnd], currentObject, globalCursor, out var maybeRawBlock))
+                    if (!NettraceReader.TryReadRawBlock(span, currentObject, globalCursor, out var maybeRawBlock))
                     {
                         needMoreMemory = true;
                         break;
@@ -230,7 +232,7 @@ static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx)
             }
             break;
         case State.FinishObject:
-            if (!NettraceReader.TryFinishObject(nettrace.Span[bufferCursor..bufferEnd], out var finishObjectLength))
+            if (!NettraceReader.TryFinishObject(span, out var finishObjectLength))
             {
                 needMoreMemory = true;
                 break;
@@ -245,7 +247,8 @@ static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx)
             throw new NotImplementedException($"{state} is not implemented");
     }
 
-    if (needMoreMemory) return (true, ctx, bufferContext);
+    if (needMoreMemory)
+        return (true, ctx, bufferContext);
 
     var bufferCursorMoved = bufferCursor - bufferCursorStart; 
     globalCursor += bufferCursorMoved;
