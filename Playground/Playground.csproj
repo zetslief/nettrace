@@ -2,6 +2,7 @@
   
   <ItemGroup>
     <ProjectReference Include="..\Nettrace\Nettrace.csproj" />
+    <ProjectReference Include="..\Ipc\Ipc.csproj" />
   </ItemGroup>
   
   <PropertyGroup>
