@@ -115,7 +115,7 @@ Console.WriteLine($"Read {stopRead} bytes from stop socket.");
 BinaryPrimitives.TryReadUInt64LittleEndian(stopResultBuffer.Span[^sizeof(ulong)..], out var sessionIdAfterStop);
 Console.WriteLine($"SessionId: {sessionIdAfterStop} {sessionId}");
 
-static async Task<(int TotalRead, BufferContext BufferCtx, Memory<byte> Buffer)> ReadDataFromSocket(Socket socket, BufferContext bufferCtx, Memory<byte> nettrace)
+static async Task<(int TotalRead, BufferContext BufferCtx, Memory<byte> Buffer)> ReadDataFromSocket(Socket socket, BufferContext bufferCtx, Memory<byte> buffer)
 {
     var requestStopwatch = new Stopwatch();
     long timeToRead = 0;
@@ -124,54 +124,54 @@ static async Task<(int TotalRead, BufferContext BufferCtx, Memory<byte> Buffer)>
     for (int attempt = 0; attempt < 100 && timeToRead < 100; ++attempt)
     {
         requestStopwatch.Start();
-        var read = await socket.ReceiveAsync(nettrace[bufferEnd..]);
+        var read = await socket.ReceiveAsync(buffer[bufferEnd..]);
         if (read == 0)
             break; // TODO: (this break is not safe, refactor it. there might be some edge case.)
         requestStopwatch.Stop();
         timeToRead = requestStopwatch.ElapsedMilliseconds;
         bufferEnd += read;
         totalRead += read;
-        if (bufferEnd == nettrace.Length)
+        if (bufferEnd == buffer.Length)
         {
-            var newNettrace = new byte[nettrace.Length];
-            nettrace[bufferCursor..].CopyTo(newNettrace);
+            var newBuffer = new byte[buffer.Length];
+            buffer[bufferCursor..].CopyTo(newBuffer);
             bufferEnd -= bufferCursor;
             bufferCursor = 0;
-            nettrace = newNettrace;
+            buffer = newBuffer;
         }
 
         requestStopwatch.Reset();
     }
 
-    return (totalRead, new(bufferCursor, bufferEnd), nettrace);
+    return (totalRead, new(bufferCursor, bufferEnd), buffer);
 }
 
-static void WriteBufferContextInfo(in BufferContext ctx, ReadOnlyMemory<byte> nettrace, int read)
+static void WriteBufferContextInfo(in BufferContext ctx, ReadOnlyMemory<byte> buffer, int read)
 {
     Console.ForegroundColor = ConsoleColor.Green;
     Console.WriteLine($"Parsing - Receive {read} bytes.");
-    Console.WriteLine($"Buffer Length - {nettrace.Length} ({nettrace.Length / 1e6d} Mb)");
+    Console.WriteLine($"Buffer Length - {buffer.Length} ({buffer.Length / 1e6d} Mb)");
     var spaceTaken = ctx.BufferEnd - ctx.BufferCursor;
-    Console.WriteLine($"Buffer Cursor - {ctx.BufferCursor} | Buffer End  - {ctx.BufferEnd} | Space Taken: {spaceTaken} ({(spaceTaken / (float)nettrace.Length) * 100:F2}%)");
+    Console.WriteLine($"Buffer Cursor - {ctx.BufferCursor} | Buffer End  - {ctx.BufferEnd} | Space Taken: {spaceTaken} ({(spaceTaken / (float)buffer.Length) * 100:F2}%)");
     Console.ResetColor();
 }
 
 static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx) ParseNettrace(
     in ParsingContext ctx,
     in BufferContext bufferContext,
-    ReadOnlyMemory<byte> nettrace)
+    ReadOnlyMemory<byte> buffer)
 {
     var (globalCursor, currentObject, state) = ctx;
     var (bufferCursor, bufferEnd) = bufferContext;
     var bufferCursorStart = bufferCursor;
     var needMoreMemory = false;
 
-    var span = nettrace.Span[bufferCursor..bufferEnd];
+    var span = buffer.Span[bufferCursor..bufferEnd];
 
     switch (ctx.State)
     {
         case State.Magic:
-            var magic = Encoding.UTF8.GetString(nettrace[..8].Span);
+            var magic = Encoding.UTF8.GetString(buffer[..8].Span);
             MoveBy(ref bufferCursor, 8);
             Console.WriteLine($"Magic: {magic}");
             state = State.StreamHeader;
