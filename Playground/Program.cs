@@ -61,7 +61,7 @@ var sessionStopwatch = Stopwatch.StartNew();
 
 while (true)
 {
-    if (sessionStopwatch.Elapsed > TimeSpan.FromMinutes(1))
+    if (sessionStopwatch.Elapsed > TimeSpan.FromSeconds(30))
     {
         var requestSuccess = await DiagnosticIpc.TryRequestStopTracing(stopSocket, sessionId);
         Debug.Assert(requestSuccess);

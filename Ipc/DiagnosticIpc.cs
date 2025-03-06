@@ -22,7 +22,7 @@ public static class DiagnosticIpc
     public static async Task<(IpcError?, ulong? sessionId)> TryCollectTracing(Socket socket, IReadOnlyCollection<Provider> providers)
     {
         var maybeCollectTracingCommandBuffer = TryCollectTracingCommand(providers);
-        if (maybeCollectTracingCommandBuffer is null) return (IpcError.UnknownError, null); 
+        if (maybeCollectTracingCommandBuffer is null) return (IpcError.UnknownError, null);
         var collectTracingCommandBuffer = maybeCollectTracingCommandBuffer.Value;
 
         var sent = await socket.SendAsync(collectTracingCommandBuffer);
@@ -30,7 +30,7 @@ public static class DiagnosticIpc
         {
             return (IpcError.UnknownError, null);
         }
-        
+
         var responseMemory = new byte[HEADER_SIZE + sizeof(ulong)];
         var responseLength = await socket.ReceiveAsync(responseMemory);
         var maybeError = TryReadCollectTracingResponse(responseMemory.AsSpan(0, responseLength), out var sessionId);
@@ -155,7 +155,7 @@ public static class DiagnosticIpc
 
         return data[..cursor];
     }
-    
+
     static int MoveBy(ref int cursor, int value)
     {
         cursor += value;
