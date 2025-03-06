@@ -343,7 +343,7 @@ public static class NettraceReader
 
         int cursor = 0;
         var blockSize = ReadInt32(buffer[cursor..MoveBy(ref cursor, sizeof(int))]);
-        
+
         var alignLength = Align(globalCursor);
         cursor += alignLength;
 
@@ -352,7 +352,7 @@ public static class NettraceReader
             result = null;
             return false;
         }
-        
+
         Memory<byte> blockBuffer = new byte[blockSize];
         buffer[cursor..MoveBy(ref cursor, blockSize)].CopyTo(blockBuffer.Span);
         result = (cursor, new(type, blockBuffer));

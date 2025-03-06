@@ -76,20 +76,20 @@ while (true)
     if (sessionStopwatch.Elapsed > TimeSpan.FromMinutes(1))
     {
         var maybeStopTracingCommandBuffer = TryStopTracing(sessionId.Value);
-        if (maybeStopTracingCommandBuffer is null) throw new InvalidOperationException("Failed to create stop tracing command buffer"); 
+        if (maybeStopTracingCommandBuffer is null) throw new InvalidOperationException("Failed to create stop tracing command buffer");
         Console.WriteLine("Sending stop command...");
-        var stopTracingWritten = await stopSocket.SendAsync(maybeStopTracingCommandBuffer.Value); 
+        var stopTracingWritten = await stopSocket.SendAsync(maybeStopTracingCommandBuffer.Value);
         Console.WriteLine("Stop command sent!");
         Debug.Assert(stopTracingWritten == maybeStopTracingCommandBuffer.Value.Length);
         break;
     }
-    
+
     if (needMoreMemory)
     {
         (var totalRead, bufferCtx, buffer) = await ReadDataFromSocket(socket, bufferCtx, buffer);
         WriteBufferContextInfo(in bufferCtx, buffer, totalRead);
     }
-    
+
     (needMoreMemory, parsingCtx, bufferCtx) = ParseNettrace(in parsingCtx, in bufferCtx, buffer);
 }
 
@@ -125,7 +125,7 @@ static async Task<(int TotalRead, BufferContext BufferCtx, Memory<byte> Buffer)>
     {
         requestStopwatch.Start();
         var read = await socket.ReceiveAsync(nettrace[bufferEnd..]);
-        if (read == 0) 
+        if (read == 0)
             break; // TODO: (this break is not safe, refactor it. there might be some edge case.)
         requestStopwatch.Stop();
         timeToRead = requestStopwatch.ElapsedMilliseconds;
@@ -135,14 +135,14 @@ static async Task<(int TotalRead, BufferContext BufferCtx, Memory<byte> Buffer)>
         {
             var newNettrace = new byte[nettrace.Length];
             nettrace[bufferCursor..].CopyTo(newNettrace);
-            bufferEnd -= bufferCursor; 
+            bufferEnd -= bufferCursor;
             bufferCursor = 0;
             nettrace = newNettrace;
         }
 
         requestStopwatch.Reset();
     }
-    
+
     return (totalRead, new(bufferCursor, bufferEnd), nettrace);
 }
 
@@ -165,14 +165,14 @@ static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx)
     var (bufferCursor, bufferEnd) = bufferContext;
     var bufferCursorStart = bufferCursor;
     var needMoreMemory = false;
-    
+
     var span = nettrace.Span[bufferCursor..bufferEnd];
 
     switch (ctx.State)
     {
         case State.Magic:
             var magic = Encoding.UTF8.GetString(nettrace[..8].Span);
-            MoveBy(ref bufferCursor, 8); 
+            MoveBy(ref bufferCursor, 8);
             Console.WriteLine($"Magic: {magic}");
             state = State.StreamHeader;
             break;
@@ -209,7 +209,7 @@ static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx)
                         needMoreMemory = true;
                         break;
                     }
-                    
+
                     var (traceLength, trace) = maybeTrace.Value;
                     Console.WriteLine($"Trace: {trace}");
                     bufferCursor += traceLength;
@@ -237,7 +237,7 @@ static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx)
                 needMoreMemory = true;
                 break;
             }
-            
+
             bufferCursor += finishObjectLength.Value;
             Console.WriteLine($"Finish current object: {currentObject}.");
             currentObject = null;
@@ -250,7 +250,7 @@ static (bool NeedMoreMemory, ParsingContext ParsinGCtx, BufferContext bufferCtx)
     if (needMoreMemory)
         return (true, ctx, bufferContext);
 
-    var bufferCursorMoved = bufferCursor - bufferCursorStart; 
+    var bufferCursorMoved = bufferCursor - bufferCursorStart;
     globalCursor += bufferCursorMoved;
     return (needMoreMemory, new(globalCursor, currentObject, state), new(bufferCursor, bufferEnd));
 }
@@ -349,11 +349,11 @@ static ReadOnlyMemory<byte>? TryStopTracing(ulong sessionId)
 
     if (!BinaryPrimitives.TryWriteUInt64LittleEndian(buffer[cursor..MoveBy(ref cursor, sizeof(ulong))], sessionId))
         return null;
-    
+
     var sizeIndex = 14;
     if (!BinaryPrimitives.TryWriteUInt16LittleEndian(buffer[sizeIndex..WithOffset(sizeIndex, 2)], (ushort)cursor))
         return null;
-    
+
     return data[..cursor];
 }
 
