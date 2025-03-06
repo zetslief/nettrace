@@ -48,11 +48,11 @@ IReadOnlyCollection<Provider> providers =
     new("ProfileMe", ulong.MaxValue, 0, string.Empty),
 ];
 
-var buffer = TryCollectTracingCommand(providers)
+var collectTracingCommandBuffer = TryCollectTracingCommand(providers)
     ?? throw new InvalidOperationException("Failed to create buffer for CollectTracing command.");
 
-var sent = await socket.SendAsync(buffer);
-if (sent != buffer.Length) throw new InvalidOperationException($"Failed to send CollectTracing command. Sent only {sent} bytes.");
+var sent = await socket.SendAsync(collectTracingCommandBuffer);
+if (sent != collectTracingCommandBuffer.Length) throw new InvalidOperationException($"Failed to send CollectTracing command. Sent only {sent} bytes.");
 
 Console.WriteLine($"Command CollectTracing: sent {sent}.");
 
@@ -64,7 +64,7 @@ if (maybeError.HasValue) throw new InvalidOperationException($"Failed to get col
 Debug.Assert(sessionId is not null);
 Console.WriteLine($"Session Id: {sessionId}");
 
-Memory<byte> nettrace = new byte[1024 * 1024 * 32];
+Memory<byte> buffer = new byte[1024 * 1024 * 32];
 BufferContext bufferCtx = new(0, 0);
 ParsingContext parsingCtx = new(0, null, State.Magic);
 bool needMoreMemory = true;
@@ -73,7 +73,7 @@ var sessionStopwatch = Stopwatch.StartNew();
 
 while (true)
 {
-    if (sessionStopwatch.Elapsed > TimeSpan.FromSeconds(60))
+    if (sessionStopwatch.Elapsed > TimeSpan.FromMinutes(1))
     {
         var maybeStopTracingCommandBuffer = TryStopTracing(sessionId.Value);
         if (maybeStopTracingCommandBuffer is null) throw new InvalidOperationException("Failed to create stop tracing command buffer"); 
@@ -86,28 +86,28 @@ while (true)
     
     if (needMoreMemory)
     {
-        (var totalRead, bufferCtx, nettrace) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
-        WriteBufferContextInfo(in bufferCtx, nettrace, totalRead);
+        (var totalRead, bufferCtx, buffer) = await ReadDataFromSocket(socket, bufferCtx, buffer);
+        WriteBufferContextInfo(in bufferCtx, buffer, totalRead);
     }
     
-    (needMoreMemory, parsingCtx, bufferCtx) = ParseNettrace(in parsingCtx, in bufferCtx, nettrace);
+    (needMoreMemory, parsingCtx, bufferCtx) = ParseNettrace(in parsingCtx, in bufferCtx, buffer);
 }
 
-(var read, bufferCtx, nettrace) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
+(var read, bufferCtx, buffer) = await ReadDataFromSocket(socket, bufferCtx, buffer);
 while (read > 0)
 {
-    WriteBufferContextInfo(in bufferCtx, nettrace, read);
-    (read, bufferCtx, nettrace) = await ReadDataFromSocket(socket, bufferCtx, nettrace);
+    WriteBufferContextInfo(in bufferCtx, buffer, read);
+    (read, bufferCtx, buffer) = await ReadDataFromSocket(socket, bufferCtx, buffer);
 }
 
 Console.WriteLine("Parsing the rest of data...");
 while (!needMoreMemory)
 {
-    WriteBufferContextInfo(in bufferCtx, nettrace, 0);
-    (needMoreMemory, parsingCtx, bufferCtx) = ParseNettrace(in parsingCtx, in bufferCtx, nettrace);
+    WriteBufferContextInfo(in bufferCtx, buffer, 0);
+    (needMoreMemory, parsingCtx, bufferCtx) = ParseNettrace(in parsingCtx, in bufferCtx, buffer);
 }
 
-WriteBufferContextInfo(in bufferCtx, nettrace, 0);
+WriteBufferContextInfo(in bufferCtx, buffer, 0);
 
 Memory<byte> stopResultBuffer = new byte[HEADER_SIZE + sizeof(ulong)];
 var stopRead = await stopSocket.ReceiveAsync(stopResultBuffer);
