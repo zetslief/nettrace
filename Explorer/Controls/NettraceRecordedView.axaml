@@ -11,5 +11,10 @@
         <vm:NettraceRecorderViewModel />
     </Design.DataContext>
     
-    Welcome to Nettrace Recorder!
-</UserControl>
+    <UserControl.DataTemplates>
+        
+    </UserControl.DataTemplates>
+    
+    <ListBox ItemsSource="{Binding Processes}">
+    </ListBox>
+</UserControl.>
