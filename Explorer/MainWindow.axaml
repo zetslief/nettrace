@@ -14,7 +14,7 @@
             <controls:NettraceReaderView DataContext="{Binding ReaderViewModel}" />
         </TabItem>
         <TabItem Header="Record">
-            Not implemented yet :)
+            <controls:NettraceRecordedView DataContext="{Binding RecorderViewModel}" />
         </TabItem>
     </TabControl>
     
