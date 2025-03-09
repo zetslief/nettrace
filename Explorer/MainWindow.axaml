@@ -9,116 +9,13 @@
     x:DataType="vm:MainWindowViewModel"
     Title="Explorer">
     
-    <Design.DataContext>
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
+    <TabControl TabStripPlacement="Left">
+        <TabItem Header="Read">
+            <controls:NettraceReaderView />
+        </TabItem>
+        <TabItem Header="Record">
+            Not implemented yet :)
+        </TabItem>
+    </TabControl>
     
-    <Window.DataTemplates>
-        <DataTemplate DataType="{x:Type vm:MetadataBlockViewModel}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Metadata Block: "/>
-                    <TextBlock Text="{Binding Blobs.Count}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Min: "/>
-                    <TextBlock
-                        Text="{Binding Header.MinTime, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Max: "/>
-                    <TextBlock
-                        Text="{Binding Header.MaxTime, StringFormat={}{0:dd/MM/yyyy HH:mm:ss.ffff}}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Duration"/>
-                    <TextBlock Text="{Binding Header.Duration}"/>
-                </StackPanel>
-            </StackPanel>
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:MetadataEventBlobViewModel}">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{Binding Payload.Header.ProviderName}"/>
-                    <TextBlock Text=" - "/>
-                    <TextBlock Text="{Binding Payload.Header.EventName}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Time: " />
-                    <TextBlock Text="{Binding Blob.TimeStamp}" />
-                    <TextBlock Text=" | Flags" />
-                    <TextBlock Text="{Binding Blob.Flags}" />
-                </StackPanel>
-                <StackPanel IsVisible="{Binding $parent[ListBoxItem].IsSelected}">
-                    <TextBlock Text="{Binding .}"
-                        TextWrapping="Wrap" />
-                </StackPanel>
-            </StackPanel>
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:EventBlobViewModel}">
-            <StackPanel>
-                <StackPanel>
-                    <TextBlock Text="{Binding Blob.SequenceNumber, StringFormat='Sequence Number: {0}'}"/>
-                    <TextBlock Text="{Binding Blob.MetadataId, StringFormat='Metadata Id: {0}'}"/>
-                    <TextBlock Text="{Binding Blob.CaptureThreadId, StringFormat='CaptureThreadId: {0}'}"/>
-                    <TextBlock Text="{Binding Timestamp, StringFormat='Timestamp: {0:dd/MM/yyyy HH:mm:ss.ffff}'}"/>
-                </StackPanel>
-                <DockPanel IsVisible="{Binding $parent[ListBoxItem].IsSelected}">
-                    <TextBlock Text="{Binding}"
-                        TextWrapping="Wrap"/>
-                </DockPanel>
-            </StackPanel>
-        </DataTemplate>
-        <DataTemplate DataType="{x:Type vm:EventBlockViewModel}">
-            <StackPanel>
-                <TextBlock Text="Event Block: "/>
-                <TextBlock Text="{Binding BlobCount, StringFormat='Event Blob Count: {0}'}"/>
-                <TextBlock Text="{Binding Header.MinTime, StringFormat='Min Timestamp: {0:dd/MM/yyyy HH:mm:ss.ffff}'}"/>
-                <TextBlock Text="{Binding Header.MinTime, StringFormat='Max Timestamp: {0:dd/MM/yyyy HH:mm:ss.ffff}'}"/>
-                <TextBlock Text="{Binding Header.Duration, StringFormat='Duration: {0}'}"/>
-            </StackPanel>
-        </DataTemplate>
-    </Window.DataTemplates>
-    
-    <Grid RowDefinitions="Auto,8*,4*">
-        <DockPanel>
-            <TextBox Text="{Binding FilePath}"
-                Watermark="Enter a file path"/>
-            <Button Command="{Binding WelcomeCommand}"
-                Content="Read"/>
-            <TextBlock Text="{Binding Status}"/>
-        </DockPanel>
-        <Grid ColumnDefinitions="2*,2*,6*,2*"
-            Grid.Row="1">
-            <DockPanel Grid.Column="0">
-                <TextBlock Text="Metadata Blocks"
-                    DockPanel.Dock="Top"/>
-                <ListBox ItemsSource="{Binding MetadataBlocks}"
-                    SelectedItem="{Binding SelectedMetadataBlock}"
-                    SelectionMode="Single" />
-            </DockPanel>
-            <DockPanel Grid.Column="1">
-                <TextBlock Text="Metadata Blobs"
-                    DockPanel.Dock="Top"/>
-                <ListBox ItemsSource="{Binding MetadataEventBlobs}"
-                    SelectedItem="{Binding SelectedMetadataEventBlob}"
-                    SelectionMode="Single" />
-            </DockPanel>
-            <DockPanel Grid.Column="2">
-                <TextBlock Text="Event Blobs"
-                    DockPanel.Dock="Top"/>
-                <ListBox ItemsSource="{Binding EventBlobs}"
-                    SelectionMode="Single" />
-            </DockPanel>
-            <DockPanel Grid.Column="3">
-                <TextBlock Text="Event Blocks"
-                    DockPanel.Dock="Top"/>
-                <ListBox ItemsSource="{Binding EventBlocks}"
-                    SelectionMode="Single" />
-            </DockPanel>
-        </Grid>
-        <Panel Grid.Row="2">
-            <controls:TimespanControl DataNode="{Binding TimePoints}" />
-        </Panel>
-    </Grid>
 </Window>
