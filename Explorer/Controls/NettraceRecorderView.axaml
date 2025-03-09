@@ -4,7 +4,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="clr-namespace:Explorer.ViewModels"
     mc:Ignorable="d"
-    x:Class="Explorer.Controls.NettraceRecordedView"
+    x:Class="Explorer.Controls.NettraceRecorderView"
     x:DataType="vm:NettraceRecorderViewModel">
     
     <Design.DataContext>
@@ -17,4 +17,4 @@
     
     <ListBox ItemsSource="{Binding Processes}">
     </ListBox>
-</UserControl.>
+</UserControl>
