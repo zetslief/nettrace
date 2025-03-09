@@ -15,7 +15,7 @@
         <DataTemplate DataType="{x:Type vm:ProcessViewModel}">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="{Binding Id}"/>
-                <TextBlock Text=" - "/>
+                <TextBlock Text=" | "/>
                 <TextBlock Text="{Binding Name}"/>
             </StackPanel>
         </DataTemplate>
