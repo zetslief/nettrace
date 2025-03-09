@@ -12,9 +12,27 @@
     </Design.DataContext>
     
     <UserControl.DataTemplates>
-        
+        <DataTemplate DataType="{x:Type vm:ProcessViewModel}">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding Id}"/>
+                <TextBlock Text=" - "/>
+                <TextBlock Text="{Binding Name}"/>
+            </StackPanel>
+        </DataTemplate>
     </UserControl.DataTemplates>
     
-    <ListBox ItemsSource="{Binding Processes}">
-    </ListBox>
+    <DockPanel>
+        <DockPanel DockPanel.Dock="Top">
+            <Button Command="{Binding RefreshCommand}"
+                DockPanel.Dock="Left">
+                Record
+            </Button>
+            <Button Command="{Binding RefreshCommand}"
+                DockPanel.Dock="Right">
+                Refresh
+            </Button>
+        </DockPanel>
+        
+        <ListBox ItemsSource="{Binding Processes}"/>
+    </DockPanel>
 </UserControl>
