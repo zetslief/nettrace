@@ -13,11 +13,16 @@
     
     <UserControl.DataTemplates>
         <DataTemplate DataType="{x:Type vm:ProcessViewModel}">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="{Binding Id}"/>
-                <TextBlock Text=" | "/>
-                <TextBlock Text="{Binding Name}"/>
-            </StackPanel>
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top">
+                    <Run Text="{Binding Id}" />
+                    <Run Text="{Binding Name}"/>
+                    <Run Text="{Binding Error}"/>
+                </TextBlock>
+                <TextBlock>
+                    <Run Text="{Binding SocketFilename}" />
+                </TextBlock>
+            </DockPanel>
         </DataTemplate>
     </UserControl.DataTemplates>
     
