@@ -17,7 +17,7 @@
                 <TextBlock DockPanel.Dock="Top">
                     <Run Text="{Binding Id}" />
                     <Run Text="{Binding Name}"/>
-                    <Run Text="{Binding Error}"/>
+                    <Run Text="{Binding Error}" Foreground="Yellow"/>
                 </TextBlock>
                 <TextBlock>
                     <Run Text="{Binding SocketFilename}" />
