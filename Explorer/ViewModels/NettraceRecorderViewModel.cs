@@ -19,20 +19,34 @@ public sealed class ProcessViewModel(string socketFileName, string? error, Proce
 public class NettraceRecorderViewModel : ReactiveObject
 {
     private IEnumerable<ProcessViewModel>? processes;
+    private ProcessViewModel? selectedProcess;
 
     public NettraceRecorderViewModel()
     {
+        RecordCommand = ReactiveCommand.Create(Record);
         RefreshCommand = ReactiveCommand.Create(Refresh);
         
         Refresh();
     }
 
+    public ICommand RecordCommand { get; }
     public ICommand RefreshCommand { get; }
 
     public IEnumerable<ProcessViewModel>? Processes
     {
         get => processes;
         set => this.RaiseAndSetIfChanged(ref processes, value);
+    }
+
+    public ProcessViewModel? SelectedProcess
+    {
+        get => selectedProcess;
+        set => this.RaiseAndSetIfChanged(ref selectedProcess, value);
+    }
+
+    private void Record()
+    {
+        Console.WriteLine($"{SelectedProcess?.SocketFilename}");
     }
 
     private void Refresh()

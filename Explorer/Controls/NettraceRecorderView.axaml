@@ -28,7 +28,7 @@
     
     <DockPanel>
         <DockPanel DockPanel.Dock="Top">
-            <Button Command="{Binding RefreshCommand}"
+            <Button Command="{Binding RecordCommand}"
                 DockPanel.Dock="Left">
                 Record
             </Button>
@@ -38,6 +38,8 @@
             </Button>
         </DockPanel>
         
-        <ListBox ItemsSource="{Binding Processes}"/>
+        <ListBox ItemsSource="{Binding Processes}"
+            SelectedItem="{Binding SelectedProcess}"
+            SelectionMode="Single"/>
     </DockPanel>
 </UserControl>
