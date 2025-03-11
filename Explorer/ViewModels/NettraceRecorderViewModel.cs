@@ -5,6 +5,8 @@ using System.IO;
 using System.Collections.Generic;
 using System.Windows.Input;
 using System.Diagnostics;
+using System.Threading.Tasks;
+using Ipc;
 
 namespace Explorer.ViewModels;
 
@@ -16,15 +18,23 @@ public sealed class ProcessViewModel(string socketFileName, string? error, Proce
     public string? Error { get; } = error;
 }
 
+public sealed class EventProviderViewModel(string name)
+{
+    public string Name { get; } = name;
+}
+
 public class NettraceRecorderViewModel : ReactiveObject
 {
     private IEnumerable<ProcessViewModel>? processes;
     private ProcessViewModel? selectedProcess;
+    private IEnumerable<EventProviderViewModel>? eventProviders;
 
     public NettraceRecorderViewModel()
     {
-        RecordCommand = ReactiveCommand.Create(Record);
+        RecordCommand = ReactiveCommand.Create(RecordAsync);
         RefreshCommand = ReactiveCommand.Create(Refresh);
+        
+        eventProviders = [new("ProfileMe")];
         
         Refresh();
     }
@@ -44,9 +54,16 @@ public class NettraceRecorderViewModel : ReactiveObject
         set => this.RaiseAndSetIfChanged(ref selectedProcess, value);
     }
 
-    private void Record()
+    public IEnumerable<EventProviderViewModel>? EventProviders
+    {
+        get => eventProviders;
+        set => this.RaiseAndSetIfChanged(ref eventProviders, value);
+    }
+
+    private Task RecordAsync()
     {
         Console.WriteLine($"{SelectedProcess?.SocketFilename}");
+        return Task.CompletedTask;
     }
 
     private void Refresh()

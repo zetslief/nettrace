@@ -24,6 +24,12 @@
                 </TextBlock>
             </DockPanel>
         </DataTemplate>
+        
+        <DataTemplate DataType="{x:Type vm:EventProviderViewModel}">
+            <DockPanel>
+                <TextBlock Text="{Binding Name}"/>
+            </DockPanel>
+        </DataTemplate>
     </UserControl.DataTemplates>
     
     <DockPanel>
@@ -38,8 +44,16 @@
             </Button>
         </DockPanel>
         
-        <ListBox ItemsSource="{Binding Processes}"
-            SelectedItem="{Binding SelectedProcess}"
-            SelectionMode="Single"/>
+        <DockPanel DockPanel.Dock="Left">
+            <TextBlock DockPanel.Dock="Top">Processes</TextBlock>
+            <ListBox ItemsSource="{Binding Processes}"
+                SelectedItem="{Binding SelectedProcess}"
+                SelectionMode="Single"/>
+        </DockPanel>
+        
+        <DockPanel>
+            <TextBlock DockPanel.Dock="Top">Event Providers</TextBlock>
+            <ListBox ItemsSource="{Binding EventProviders}"/>
+        </DockPanel>
     </DockPanel>
 </UserControl>
