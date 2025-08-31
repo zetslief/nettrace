@@ -1,6 +1,6 @@
-﻿using System.Net.Sockets;
+﻿using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
-using System.Buffers.Binary;
+using System.Net.Sockets;
 using System.Text;
 
 namespace Ipc;

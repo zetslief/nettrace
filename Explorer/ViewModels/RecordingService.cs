@@ -26,7 +26,7 @@ public sealed class RecordingService(string filename, IReadOnlyCollection<Provid
             Console.WriteLine($"Failed to start collecting trace: {maybeError}");
             return maybeError ?? IpcError.UnknownError;
         }
-        
+
         SessionId = maybeSessionId.Value;
         Console.WriteLine($"Tracing start for session {SessionId}");
         return null;
@@ -36,7 +36,7 @@ public sealed class RecordingService(string filename, IReadOnlyCollection<Provid
     {
         if (SessionId is null) throw new InvalidOperationException($"Failed to stop recording. Session Id is not known.");
         if (_networkSocket is null) throw new InvalidOperationException($"Failed to stop recording. Socket is null.");
-        
+
         Console.WriteLine($"Stopping...");
         var stopEndpoint = new UnixDomainSocketEndPoint(_filename);
         using var stopSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
@@ -48,23 +48,23 @@ public sealed class RecordingService(string filename, IReadOnlyCollection<Provid
             Console.WriteLine($"Failed to request stop tracing.");
             return;
         }
-        
+
         var buffer = new byte[1024];
         var totalRead = 0;
         var read = 0;
         do
         {
-            read = await _networkSocket.ReceiveAsync(buffer).ConfigureAwait(false); 
+            read = await _networkSocket.ReceiveAsync(buffer).ConfigureAwait(false);
             totalRead += read;
         }
         while (read > 0);
 
         Console.WriteLine($"Reading {totalRead} bytes...");
-        
+
         Console.WriteLine($"Waiting for session to be stopped...");
         var stopped = await DiagnosticIpc.TryWaitStopTracing(stopSocket, SessionId.Value).ConfigureAwait(false);
         Console.WriteLine($"Tracing stopped: {stopped}");
     }
-    
+
     public void Dispose() => _networkSocket?.Dispose();
 }

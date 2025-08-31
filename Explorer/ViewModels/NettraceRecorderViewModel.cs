@@ -1,12 +1,12 @@
-using ReactiveUI;
-using System.Linq;
 using System;
-using System.IO;
 using System.Collections.Generic;
-using System.Windows.Input;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
+using System.Windows.Input;
 using Ipc;
+using ReactiveUI;
 
 namespace Explorer.ViewModels;
 
@@ -33,9 +33,9 @@ public class NettraceRecorderViewModel : ReactiveObject
     {
         RecordCommand = ReactiveCommand.Create(RecordAsync);
         RefreshCommand = ReactiveCommand.Create(Refresh);
-        
+
         eventProviders = [new("ProfileMe")];
-        
+
         Refresh();
     }
 
@@ -64,16 +64,16 @@ public class NettraceRecorderViewModel : ReactiveObject
     {
         static Provider ToEventProvider(EventProviderViewModel vm)
             => new(vm.Name, ulong.MaxValue, 0, string.Empty);
-        
+
         Console.WriteLine($"{SelectedProcess?.SocketFilename}");
         if (EventProviders is null || SelectedProcess is null)
         {
             return;
         }
-        
+
         using var recordingService = new RecordingService(SelectedProcess.SocketFilename, [.. EventProviders.Select(ToEventProvider)]);
         var maybeError = await recordingService.StartAsync().ConfigureAwait(false);
-        
+
         if (maybeError is not null || recordingService.SessionId is null)
         {
             Console.WriteLine($"Failed to start collecting trace: {maybeError}");

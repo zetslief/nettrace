@@ -1,9 +1,9 @@
-﻿using System.Diagnostics;
+﻿using System.Buffers.Binary;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
-using System.Buffers.Binary;
-using Nettrace;
 using Ipc;
+using Nettrace;
 
 var process = Process.GetProcessesByName("profileMe").Single();
 

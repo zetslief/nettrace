@@ -1,15 +1,14 @@
-using Explorer.Controls;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
 using System.Windows.Input;
-using ReactiveUI;
+using Explorer.Controls;
 using Nettrace;
-
-using static Nettrace.NettraceReader;
+using ReactiveUI;
 using static Nettrace.Helpers;
+using static Nettrace.NettraceReader;
 
 namespace Explorer.ViewModels;
 
