@@ -6,32 +6,33 @@
     mc:Ignorable="d"
     x:Class="Explorer.Controls.NettraceRecorderView"
     x:DataType="vm:NettraceRecorderViewModel">
-    
+
     <Design.DataContext>
         <vm:NettraceRecorderViewModel />
     </Design.DataContext>
-    
+
     <UserControl.DataTemplates>
         <DataTemplate DataType="{x:Type vm:ProcessViewModel}">
             <DockPanel>
                 <TextBlock DockPanel.Dock="Top">
+                    <Bold><Run Text="{Binding Name}" /></Bold>
+                    <LineBreak />
                     <Run Text="{Binding Id}" />
-                    <Run Text="{Binding Name}"/>
-                    <Run Text="{Binding Error}" Foreground="Yellow"/>
+                    <Run Text="{Binding Error}" Foreground="Yellow" />
                 </TextBlock>
                 <TextBlock>
                     <Run Text="{Binding SocketFilename}" />
                 </TextBlock>
             </DockPanel>
         </DataTemplate>
-        
+
         <DataTemplate DataType="{x:Type vm:EventProviderViewModel}">
             <DockPanel>
                 <TextBlock Text="{Binding Name}"/>
             </DockPanel>
         </DataTemplate>
     </UserControl.DataTemplates>
-    
+
     <DockPanel>
         <DockPanel DockPanel.Dock="Top">
             <Button Command="{Binding RecordCommand}"
@@ -43,15 +44,23 @@
                 Refresh
             </Button>
         </DockPanel>
-        
-        <DockPanel DockPanel.Dock="Left">
-            <TextBlock DockPanel.Dock="Top">Processes</TextBlock>
-            <ListBox ItemsSource="{Binding Processes}"
-                SelectedItem="{Binding SelectedProcess}"
-                SelectionMode="Single"/>
-        </DockPanel>
-        
-        <DockPanel>
+
+        <StackPanel DockPanel.Dock="Left">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top">Processes</TextBlock>
+                <ListBox ItemsSource="{Binding Processes}"
+                    SelectedItem="{Binding SelectedProcess}"
+                    SelectionMode="Single"/>
+            </DockPanel>
+
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top">Failed to parse processes: </TextBlock>
+                <ListBox ItemsSource="{Binding FailedProcesses}"
+                    SelectionMode="Single"/>
+            </DockPanel>
+        </StackPanel>
+
+        <DockPanel DockPanel.Dock="Right">
             <TextBlock DockPanel.Dock="Top">Event Providers</TextBlock>
             <ListBox ItemsSource="{Binding EventProviders}"/>
         </DockPanel>

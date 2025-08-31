@@ -26,6 +26,7 @@ public sealed class EventProviderViewModel(string name)
 public class NettraceRecorderViewModel : ReactiveObject
 {
     private IEnumerable<ProcessViewModel>? processes;
+    private IEnumerable<ProcessViewModel>? failedProcesses;
     private ProcessViewModel? selectedProcess;
     private IEnumerable<EventProviderViewModel>? eventProviders;
 
@@ -46,6 +47,12 @@ public class NettraceRecorderViewModel : ReactiveObject
     {
         get => processes;
         set => this.RaiseAndSetIfChanged(ref processes, value);
+    }
+
+    public IEnumerable<ProcessViewModel>? FailedProcesses
+    {
+        get => failedProcesses;
+        set => this.RaiseAndSetIfChanged(ref failedProcesses, value);
     }
 
     public ProcessViewModel? SelectedProcess
@@ -95,7 +102,7 @@ public class NettraceRecorderViewModel : ReactiveObject
             var endIndex = fileName.IndexOf('-', prefix.Length);
             var range = prefix.Length..endIndex;
             var processId = fileName[range];
-            if (!int.TryParse(processId, out var id))
+            if (!int.TryParse(processId, out int id))
             {
                 return new(socketFile, $"Failed to parse process id {processId} in {fileName}({range})", null);
             }
@@ -111,10 +118,15 @@ public class NettraceRecorderViewModel : ReactiveObject
             }
         }
 
-        var directory = Environment.GetEnvironmentVariable("TMP") ?? "/tmp";
-        var files = Directory.GetFiles(directory, $"{prefix}*");
-        Processes = files
+        string directory = Environment.GetEnvironmentVariable("TMP") ?? "/tmp";
+        string[] files = Directory.GetFiles(directory, $"{prefix}*");
+        Processes = [ ..files
             .Select(FileToProcess)
-            .ToArray();
+            .Where(pvm => pvm.Error is null)
+        ];
+        FailedProcesses = [ ..files
+            .Select(FileToProcess)
+            .Where(pvm => pvm.Error is not null)
+        ];
     }
 }

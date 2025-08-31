@@ -8,7 +8,15 @@
     x:Class="Explorer.MainWindow"
     x:DataType="vm:MainWindowViewModel"
     Title="Explorer">
-    
+
+    <Window.Styles>
+        <Style Selector="ListBoxItem">
+            <Setter Property="BorderBrush" Value="Darkblue"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Margin" Value="3"/>
+        </Style>
+    </Window.Styles>
+
     <TabControl TabStripPlacement="Left">
         <TabItem Header="Read">
             <controls:NettraceReaderView DataContext="{Binding ReaderViewModel}" />
@@ -17,5 +25,5 @@
             <controls:NettraceRecorderView DataContext="{Binding RecorderViewModel}" />
         </TabItem>
     </TabControl>
-    
+
 </Window>
