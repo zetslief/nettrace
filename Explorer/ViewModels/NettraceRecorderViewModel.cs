@@ -32,6 +32,7 @@ public class NettraceRecorderViewModel : ReactiveObject
     private IEnumerable<ProcessViewModel>? failedProcesses;
     private ProcessViewModel? selectedProcess;
     private IEnumerable<EventProviderViewModel>? eventProviders;
+    private bool _openFileAutomatically = true;
 
     public NettraceRecorderViewModel(ILogger<NettraceRecorderViewModel> logger)
     {
@@ -69,6 +70,12 @@ public class NettraceRecorderViewModel : ReactiveObject
     {
         get => eventProviders;
         set => this.RaiseAndSetIfChanged(ref eventProviders, value);
+    }
+
+    public bool OpenFileAutomatically
+    {
+        get => _openFileAutomatically;
+        set => this.RaiseAndSetIfChanged(ref _openFileAutomatically, value);
     }
 
     private async Task RecordAsync()

@@ -7,10 +7,6 @@
     x:Class="Explorer.Controls.NettraceRecorderView"
     x:DataType="vm:NettraceRecorderViewModel">
 
-    <Design.DataContext>
-        <vm:NettraceRecorderViewModel />
-    </Design.DataContext>
-
     <UserControl.DataTemplates>
         <DataTemplate DataType="{x:Type vm:ProcessViewModel}">
             <DockPanel>
@@ -35,8 +31,9 @@
 
     <DockPanel>
         <DockPanel DockPanel.Dock="Top">
-            <Button Command="{Binding RecordCommand}" DockPanel.Dock="Left">Record</Button>
-            <Button Command="{Binding RefreshCommand}" DockPanel.Dock="Right">Refresh</Button>
+            <Button Command="{Binding RecordCommand}">Record</Button>
+            <Button Command="{Binding RefreshCommand}">Refresh</Button>
+            <CheckBox IsChecked="{Binding OpenFileAutomatically}">Open file after recording</CheckBox>
         </DockPanel>
 
         <TabControl DockPanel.Dock="Left">

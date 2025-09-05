@@ -18,11 +18,11 @@
     </Window.Styles>
 
     <TabControl TabStripPlacement="Left">
-        <TabItem Header="Read">
-            <controls:NettraceReaderView DataContext="{Binding ReaderViewModel}" />
-        </TabItem>
         <TabItem Header="Record">
             <controls:NettraceRecorderView DataContext="{Binding RecorderViewModel}" />
+        </TabItem>
+        <TabItem Header="Read">
+            <controls:NettraceReaderView DataContext="{Binding ReaderViewModel}" />
         </TabItem>
     </TabControl>
 
