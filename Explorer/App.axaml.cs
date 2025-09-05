@@ -4,10 +4,12 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using Explorer.Controls;
 using Explorer.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
+using ViewLocator = Explorer.Controls.ViewLocator;
 
 namespace Explorer;
 
@@ -27,17 +29,18 @@ public partial class App : Application
     {
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddLogging(builder => builder.AddConsole());
+        serviceCollection.AddSingleton<ViewLocator>();
         serviceCollection.AddSingleton<NettraceReaderViewModel>();
+        serviceCollection.AddSingleton<NettraceReaderView>();
         serviceCollection.AddSingleton<NettraceRecorderViewModel>();
+        serviceCollection.AddSingleton<NettraceRecorderView>();
         serviceCollection.AddSingleton<MainWindowViewModel>();
         var serviceProvider = serviceCollection.BuildServiceProvider();
         var viewModel = serviceProvider.GetRequiredService<MainWindowViewModel>();
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow()
-            {
-                DataContext = viewModel
-            };
+            DataTemplates.Add(serviceProvider.GetRequiredService<ViewLocator>());
+            desktop.MainWindow = new MainWindow() { DataContext = viewModel };
         }
 
         base.OnFrameworkInitializationCompleted();
