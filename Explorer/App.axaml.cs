@@ -5,6 +5,8 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Explorer.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
 namespace Explorer;
@@ -23,11 +25,18 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        var serviceCollection = new ServiceCollection();
+        serviceCollection.AddLogging(builder => builder.AddConsole());
+        serviceCollection.AddSingleton<NettraceReaderViewModel>();
+        serviceCollection.AddSingleton<NettraceRecorderViewModel>();
+        serviceCollection.AddSingleton<MainWindowViewModel>();
+        var serviceProvider = serviceCollection.BuildServiceProvider();
+        var viewModel = serviceProvider.GetRequiredService<MainWindowViewModel>();
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = new MainWindow()
             {
-                DataContext = new MainWindowViewModel()
+                DataContext = viewModel
             };
         }
 

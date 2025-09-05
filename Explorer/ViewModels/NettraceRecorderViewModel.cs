@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Microsoft.Extensions.Logging;
 using Ipc;
 using Nettrace;
 using ReactiveUI;
@@ -26,13 +27,15 @@ public sealed class EventProviderViewModel(string name)
 
 public class NettraceRecorderViewModel : ReactiveObject
 {
+    private readonly ILogger<NettraceRecorderViewModel> _logger;
     private IEnumerable<ProcessViewModel>? processes;
     private IEnumerable<ProcessViewModel>? failedProcesses;
     private ProcessViewModel? selectedProcess;
     private IEnumerable<EventProviderViewModel>? eventProviders;
 
-    public NettraceRecorderViewModel()
+    public NettraceRecorderViewModel(ILogger<NettraceRecorderViewModel> logger)
     {
+        _logger = logger;
         RecordCommand = ReactiveCommand.Create(RecordAsync);
         RefreshCommand = ReactiveCommand.Create(Refresh);
 
@@ -73,33 +76,33 @@ public class NettraceRecorderViewModel : ReactiveObject
         static Provider ToEventProvider(EventProviderViewModel vm)
             => new(vm.Name, ulong.MaxValue, 0, string.Empty);
 
-        Console.WriteLine($"{SelectedProcess?.SocketFilename}");
+        _logger.LogInformation("{SelectedProcessSocketFilename}", SelectedProcess?.SocketFilename);
         if (EventProviders is null || SelectedProcess is null)
         {
             return;
         }
 
-        using var recordingService = new RecordingService(SelectedProcess.SocketFilename, [.. EventProviders.Select(ToEventProvider)]);
+        using var recordingService = new RecordingService(SelectedProcess.SocketFilename, [.. EventProviders.Select(ToEventProvider)], _logger);
         var maybeError = await recordingService.StartAsync().ConfigureAwait(false);
 
         if (maybeError is not null || recordingService.SessionId is null)
         {
-            Console.WriteLine($"Failed to start collecting trace: {maybeError}");
+            _logger.LogError("Failed to start collecting trace: {MaybeError}", maybeError);
             return;
         }
 
         await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
 
-        var bytes = await recordingService.StopAsync().ConfigureAwait(false);
+        byte[]? bytes = await recordingService.StopAsync().ConfigureAwait(false);
         if (bytes is null)
         {
-            Console.WriteLine($"Failed to stop recording.");
+            _logger.LogError("Failed to stop recording.");
             return;
         }
 
         using var stream = new MemoryStream(bytes);
         var nettraceFile = NettraceReader.Read(stream);
-        Console.WriteLine(nettraceFile);
+        _logger.LogInformation("{NettraceFile}", nettraceFile);
     }
 
     private void Refresh()
