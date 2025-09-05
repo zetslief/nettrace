@@ -32,7 +32,7 @@ public sealed class RecordingService(string filename, IReadOnlyCollection<Provid
         return null;
     }
 
-    public async Task StopAsync()
+    public async Task<byte[]?> StopAsync()
     {
         if (SessionId is null) throw new InvalidOperationException($"Failed to stop recording. Session Id is not known.");
         if (_networkSocket is null) throw new InvalidOperationException($"Failed to stop recording. Socket is null.");
@@ -46,24 +46,26 @@ public sealed class RecordingService(string filename, IReadOnlyCollection<Provid
         if (!stopRequested)
         {
             Console.WriteLine($"Failed to request stop tracing.");
-            return;
+            return null;
         }
 
-        var buffer = new byte[1024];
+        byte[] buffer = new byte[1024 * 1024 * 1024];
         var totalRead = 0;
         var read = 0;
         do
         {
-            read = await _networkSocket.ReceiveAsync(buffer).ConfigureAwait(false);
+            read = await _networkSocket.ReceiveAsync(buffer.AsMemory(totalRead)).ConfigureAwait(false);
             totalRead += read;
         }
         while (read > 0);
 
-        Console.WriteLine($"Reading {totalRead} bytes...");
+        Console.WriteLine($"Read {totalRead} bytes... Capacity = {buffer.Length}");
 
         Console.WriteLine($"Waiting for session to be stopped...");
-        var stopped = await DiagnosticIpc.TryWaitStopTracing(stopSocket, SessionId.Value).ConfigureAwait(false);
-        Console.WriteLine($"Tracing stopped: {stopped}");
+        ulong? stopped = await DiagnosticIpc.TryWaitStopTracing(stopSocket, SessionId.Value).ConfigureAwait(false);
+        Console.WriteLine($"Tracing stopped: {(stopped ?? 0)}");
+
+        return buffer[..totalRead];;
     }
 
     public void Dispose() => _networkSocket?.Dispose();

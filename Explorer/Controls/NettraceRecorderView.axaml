@@ -35,30 +35,22 @@
 
     <DockPanel>
         <DockPanel DockPanel.Dock="Top">
-            <Button Command="{Binding RecordCommand}"
-                DockPanel.Dock="Left">
-                Record
-            </Button>
-            <Button Command="{Binding RefreshCommand}"
-                DockPanel.Dock="Right">
-                Refresh
-            </Button>
+            <Button Command="{Binding RecordCommand}" DockPanel.Dock="Left">Record</Button>
+            <Button Command="{Binding RefreshCommand}" DockPanel.Dock="Right">Refresh</Button>
         </DockPanel>
 
-        <StackPanel DockPanel.Dock="Left">
-            <DockPanel>
-                <TextBlock DockPanel.Dock="Top">Processes</TextBlock>
+        <TabControl DockPanel.Dock="Left">
+            <TabItem Header="Processes">
                 <ListBox ItemsSource="{Binding Processes}"
                     SelectedItem="{Binding SelectedProcess}"
                     SelectionMode="Single"/>
-            </DockPanel>
+            </TabItem>
 
-            <DockPanel>
-                <TextBlock DockPanel.Dock="Top">Failed to parse processes: </TextBlock>
+            <TabItem Header="Failed to parse">
                 <ListBox ItemsSource="{Binding FailedProcesses}"
                     SelectionMode="Single"/>
-            </DockPanel>
-        </StackPanel>
+            </TabItem>
+        </TabControl>
 
         <DockPanel DockPanel.Dock="Right">
             <TextBlock DockPanel.Dock="Top">Event Providers</TextBlock>

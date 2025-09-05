@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Ipc;
+using Nettrace;
 using ReactiveUI;
 
 namespace Explorer.ViewModels;
@@ -35,7 +36,7 @@ public class NettraceRecorderViewModel : ReactiveObject
         RecordCommand = ReactiveCommand.Create(RecordAsync);
         RefreshCommand = ReactiveCommand.Create(Refresh);
 
-        eventProviders = [new("ProfileMe")];
+        eventProviders = [new("ProfileMe"), new("System.Threading.Tasks.TplEventSource")];
 
         Refresh();
     }
@@ -89,7 +90,16 @@ public class NettraceRecorderViewModel : ReactiveObject
 
         await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
 
-        await recordingService.StopAsync().ConfigureAwait(false);
+        var bytes = await recordingService.StopAsync().ConfigureAwait(false);
+        if (bytes is null)
+        {
+            Console.WriteLine($"Failed to stop recording.");
+            return;
+        }
+
+        using var stream = new MemoryStream(bytes);
+        var nettraceFile = NettraceReader.Read(stream);
+        Console.WriteLine(nettraceFile);
     }
 
     private void Refresh()

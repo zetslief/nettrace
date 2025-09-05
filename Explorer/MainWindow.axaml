@@ -11,7 +11,7 @@
 
     <Window.Styles>
         <Style Selector="ListBoxItem">
-            <Setter Property="BorderBrush" Value="Darkblue"/>
+            <Setter Property="BorderBrush" Value="DarkGreen"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Margin" Value="3"/>
         </Style>
