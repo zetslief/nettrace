@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Ipc;
+using Microsoft.Extensions.Logging;
 
 namespace Explorer.ViewModels;
 
@@ -66,7 +66,7 @@ public sealed class RecordingService(string filename, IReadOnlyCollection<Provid
         _logger.LogInformation("Waiting for session to be stopped...");
         ulong? stopped = await DiagnosticIpc.TryWaitStopTracing(stopSocket, SessionId.Value).ConfigureAwait(false);
         _logger.LogInformation("Tracing stopped: {Stopped}", stopped ?? 0);
-        return buffer[..totalRead];;
+        return buffer[..totalRead];
     }
 
     public void Dispose() => _networkSocket?.Dispose();

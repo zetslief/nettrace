@@ -5,8 +5,8 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using Microsoft.Extensions.Logging;
 using Ipc;
+using Microsoft.Extensions.Logging;
 using Nettrace;
 using ReactiveUI;
 
@@ -133,11 +133,11 @@ public class NettraceRecorderViewModel : ReactiveObject
 
         string directory = Environment.GetEnvironmentVariable("TMP") ?? "/tmp";
         string[] files = Directory.GetFiles(directory, $"{prefix}*");
-        Processes = [ ..files
+        Processes = [.. files
             .Select(FileToProcess)
             .Where(pvm => pvm.Error is null)
         ];
-        FailedProcesses = [ ..files
+        FailedProcesses = [.. files
             .Select(FileToProcess)
             .Where(pvm => pvm.Error is not null)
         ];
