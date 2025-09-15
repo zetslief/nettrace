@@ -7,11 +7,7 @@
     mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
     x:Class="Explorer.Controls.NettraceReaderView"
     x:DataType="vm:NettraceReaderViewModel">
-    
-    <Design.DataContext>
-        <vm:NettraceReaderViewModel />
-    </Design.DataContext>
-    
+
     <UserControl.DataTemplates>
         <DataTemplate DataType="{x:Type vm:MetadataBlockViewModel}">
             <StackPanel>
@@ -78,12 +74,12 @@
             </StackPanel>
         </DataTemplate>
     </UserControl.DataTemplates>
-    
+
     <Grid RowDefinitions="Auto,8*,4*">
         <DockPanel>
             <TextBox Text="{Binding FilePath}"
                 Watermark="Enter a file path"/>
-            <Button Command="{Binding WelcomeCommand}"
+            <Button Command="{Binding ReadFileCommand}"
                 Content="Read"/>
             <TextBlock Text="{Binding Status}"/>
         </DockPanel>

@@ -74,7 +74,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     {
         _parser = parser;
         logger.LogInformation("{ViewModelType}  is created.", typeof(NettraceRecorderViewModel));
-        WelcomeCommand = ReactiveCommand.Create(OnCommand);
+        ReadFileCommand = ReactiveCommand.Create(OnFileRead);
 
         this.WhenAnyValue(v => v.MetadataBlocks)
             .Select(MetadataBlockViewModel? (m) => null)
@@ -92,7 +92,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
             => ReadFile(parser.GetFile() ?? throw new InvalidOperationException($"Failed to get nettrace file."));
     }
 
-    public ICommand WelcomeCommand { get; }
+    public ICommand ReadFileCommand { get; }
 
     public string? FilePath
     {
@@ -136,12 +136,10 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         private set => this.RaiseAndSetIfChanged(ref _status, value);
     }
 
-    private void OnCommand()
+    private void OnFileRead()
     {
         if (_filePath is null)
-        {
             return;
-        }
 
         string path = Path.GetFullPath(_filePath);
 
