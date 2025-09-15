@@ -30,10 +30,10 @@ public class NettraceRecorderViewModel : ReactiveObject, IViewModel
 {
     private readonly ILogger<NettraceRecorderViewModel> _logger;
     private readonly Navigator _navigator;
-    private IEnumerable<ProcessViewModel>? processes;
-    private IEnumerable<ProcessViewModel>? failedProcesses;
-    private ProcessViewModel? selectedProcess;
-    private IEnumerable<EventProviderViewModel>? eventProviders;
+    private IEnumerable<ProcessViewModel>? _processes;
+    private IEnumerable<ProcessViewModel>? _failedProcesses;
+    private ProcessViewModel? _selectedProcess;
+    private IEnumerable<EventProviderViewModel>? _eventProviders;
     private bool _openFileAutomatically = true;
 
     public NettraceRecorderViewModel(ILogger<NettraceRecorderViewModel> logger, Navigator navigator)
@@ -44,7 +44,7 @@ public class NettraceRecorderViewModel : ReactiveObject, IViewModel
         RecordCommand = ReactiveCommand.Create(RecordAsync);
         RefreshCommand = ReactiveCommand.Create(Refresh);
 
-        eventProviders = [new("ProfileMe"), new("System.Threading.Tasks.TplEventSource")];
+        _eventProviders = [new("ProfileMe"), new("System.Threading.Tasks.TplEventSource")];
 
         Refresh();
     }
@@ -54,26 +54,26 @@ public class NettraceRecorderViewModel : ReactiveObject, IViewModel
 
     public IEnumerable<ProcessViewModel>? Processes
     {
-        get => processes;
-        set => this.RaiseAndSetIfChanged(ref processes, value);
+        get => _processes;
+        set => this.RaiseAndSetIfChanged(ref _processes, value);
     }
 
     public IEnumerable<ProcessViewModel>? FailedProcesses
     {
-        get => failedProcesses;
-        set => this.RaiseAndSetIfChanged(ref failedProcesses, value);
+        get => _failedProcesses;
+        set => this.RaiseAndSetIfChanged(ref _failedProcesses, value);
     }
 
     public ProcessViewModel? SelectedProcess
     {
-        get => selectedProcess;
-        set => this.RaiseAndSetIfChanged(ref selectedProcess, value);
+        get => _selectedProcess;
+        set => this.RaiseAndSetIfChanged(ref _selectedProcess, value);
     }
 
     public IEnumerable<EventProviderViewModel>? EventProviders
     {
-        get => eventProviders;
-        set => this.RaiseAndSetIfChanged(ref eventProviders, value);
+        get => _eventProviders;
+        set => this.RaiseAndSetIfChanged(ref _eventProviders, value);
     }
 
     public bool OpenFileAutomatically

@@ -53,22 +53,22 @@ public class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob)
 
 public class NettraceReaderViewModel : ReactiveObject, IViewModel
 {
-    private string? filePath = "./../traces/perf_with_work.nettrace";
-    private string status = string.Empty;
+    private string? _filePath = "./../traces/perf_with_work.nettrace";
+    private string _status = string.Empty;
 
-    private Trace? trace;
+    private Trace? _trace;
 
-    private IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks = null;
-    private MetadataBlockViewModel? selectedMetadataBlock = null;
+    private IReadOnlyCollection<MetadataBlockViewModel>? _metadataBlocks = null;
+    private MetadataBlockViewModel? _selectedMetadataBlock = null;
 
-    private IReadOnlyCollection<EventBlockViewModel>? eventBlocks = null;
+    private IReadOnlyCollection<EventBlockViewModel>? _eventBlocks = null;
 
-    private readonly ObservableAsPropertyHelper<IEnumerable<MetadataEventBlobViewModel>?> metadataEventBlobs;
-    private MetadataEventBlobViewModel? selectedMetadataEventBlob = null;
-    private EventBlobViewModel[]? allEventBlobs;
+    private readonly ObservableAsPropertyHelper<IEnumerable<MetadataEventBlobViewModel>?> _metadataEventBlobs;
+    private MetadataEventBlobViewModel? _selectedMetadataEventBlob = null;
+    private EventBlobViewModel[]? _allEventBlobs;
 
-    private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> eventBlobs;
-    private readonly ObservableAsPropertyHelper<Node> timePoints;
+    private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> _eventBlobs;
+    private readonly ObservableAsPropertyHelper<Node> _timePoints;
 
     public NettraceReaderViewModel(ILogger<NettraceReaderViewModel> logger)
     {
@@ -78,13 +78,13 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         this.WhenAnyValue(v => v.MetadataBlocks)
             .Select(MetadataBlockViewModel? (m) => null)
             .ToProperty(this, vm => vm.SelectedMetadataBlock);
-        metadataEventBlobs = this.WhenAnyValue(x => x.SelectedMetadataBlock)
+        _metadataEventBlobs = this.WhenAnyValue(x => x.SelectedMetadataBlock)
             .Select(metadataBlock => metadataBlock?.Blobs)
             .ToProperty(this, vm => vm.MetadataEventBlobs);
-        eventBlobs = this.WhenAnyValue(x => x.SelectedMetadataEventBlob)
-            .Select(blob => allEventBlobs?.Where(eb => eb.Blob.MetadataId == blob?.Payload.Header.MetaDataId).ToArray())
+        _eventBlobs = this.WhenAnyValue(x => x.SelectedMetadataEventBlob)
+            .Select(blob => _allEventBlobs?.Where(eb => eb.Blob.MetadataId == blob?.Payload.Header.MetaDataId).ToArray())
             .ToProperty(this, vm => vm.EventBlobs);
-        timePoints = this.WhenAnyValue(v => v.MetadataBlocks, v => v.EventBlocks, v => v.EventBlobs, ToLabeledRanges)
+        _timePoints = this.WhenAnyValue(v => v.MetadataBlocks, v => v.EventBlocks, v => v.EventBlobs, ToLabeledRanges)
             .ToProperty(this, vm => vm.TimePoints);
     }
 
@@ -92,54 +92,54 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
 
     public string? FilePath
     {
-        get => filePath;
-        set => this.RaiseAndSetIfChanged(ref filePath, value);
+        get => _filePath;
+        set => this.RaiseAndSetIfChanged(ref _filePath, value);
     }
 
     public IReadOnlyCollection<MetadataBlockViewModel>? MetadataBlocks
     {
-        get => metadataBlocks;
-        private set => this.RaiseAndSetIfChanged(ref metadataBlocks, value);
+        get => _metadataBlocks;
+        private set => this.RaiseAndSetIfChanged(ref _metadataBlocks, value);
     }
 
     public MetadataBlockViewModel? SelectedMetadataBlock
     {
-        get => selectedMetadataBlock;
-        set => this.RaiseAndSetIfChanged(ref selectedMetadataBlock, value);
+        get => _selectedMetadataBlock;
+        set => this.RaiseAndSetIfChanged(ref _selectedMetadataBlock, value);
     }
 
     public IReadOnlyCollection<EventBlockViewModel>? EventBlocks
     {
-        get => this.eventBlocks;
-        set => this.RaiseAndSetIfChanged(ref eventBlocks, value);
+        get => this._eventBlocks;
+        set => this.RaiseAndSetIfChanged(ref _eventBlocks, value);
     }
 
-    public IEnumerable<MetadataEventBlobViewModel>? MetadataEventBlobs => metadataEventBlobs.Value;
+    public IEnumerable<MetadataEventBlobViewModel>? MetadataEventBlobs => _metadataEventBlobs.Value;
 
     public MetadataEventBlobViewModel? SelectedMetadataEventBlob
     {
-        get => selectedMetadataEventBlob;
-        set => this.RaiseAndSetIfChanged(ref selectedMetadataEventBlob, value);
+        get => _selectedMetadataEventBlob;
+        set => this.RaiseAndSetIfChanged(ref _selectedMetadataEventBlob, value);
     }
 
-    public IReadOnlyCollection<EventBlobViewModel>? EventBlobs => eventBlobs.Value;
+    public IReadOnlyCollection<EventBlobViewModel>? EventBlobs => _eventBlobs.Value;
 
-    public Node TimePoints => timePoints.Value;
+    public Node TimePoints => _timePoints.Value;
 
     public string Status
     {
-        get => status;
-        private set => this.RaiseAndSetIfChanged(ref status, value);
+        get => _status;
+        private set => this.RaiseAndSetIfChanged(ref _status, value);
     }
 
     private void OnCommand()
     {
-        if (filePath is null)
+        if (_filePath is null)
         {
             return;
         }
 
-        var path = Path.GetFullPath(filePath);
+        var path = Path.GetFullPath(_filePath);
 
         if (!File.Exists(path))
         {
@@ -149,15 +149,15 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
 
         using var stream = File.Open(path, FileMode.Open);
         var nettrace = NettraceReader.Read(stream);
-        trace = nettrace.Trace;
-        allEventBlobs = nettrace.EventBlocks
+        _trace = nettrace.Trace;
+        _allEventBlobs = nettrace.EventBlocks
             .SelectMany(block => block.EventBlobs)
-            .Select(blob => new EventBlobViewModel(trace, blob))
+            .Select(blob => new EventBlobViewModel(_trace, blob))
             .ToArray();
         MetadataBlocks = nettrace.MetadataBlocks
-            .Select(block => new MetadataBlockViewModel(trace, block))
+            .Select(block => new MetadataBlockViewModel(_trace, block))
             .ToArray();
-        EventBlocks = nettrace.EventBlocks.Select(block => new EventBlockViewModel(trace, block)).ToArray();
+        EventBlocks = nettrace.EventBlocks.Select(block => new EventBlockViewModel(_trace, block)).ToArray();
         Status = $"Read {stream.Position} bytes";
     }
 
@@ -171,21 +171,21 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         if (eventBlobs?.Count > 0)
         {
             var eventBlobNodes = new List<Node>();
-            BlobsToRanges(trace!, eventBlobs, eventBlobNodes);
+            BlobsToRanges(_trace!, eventBlobs, eventBlobNodes);
             result.Add(new TreeNode(eventBlobNodes));
         }
 
         if (eventBlocks?.Count > 0)
         {
             var eventBlockNodes = new List<Node>();
-            EventBlocksToRanges(trace!, eventBlocks, eventBlockNodes);
+            EventBlocksToRanges(_trace!, eventBlocks, eventBlockNodes);
             result.Add(new TreeNode(eventBlockNodes));
         }
 
         if (metadataBlocks?.Count > 0)
         {
             var metadataBlockNodes = new List<Node>();
-            MetadataBlocksToRanges(trace!, metadataBlocks, metadataBlockNodes);
+            MetadataBlocksToRanges(_trace!, metadataBlocks, metadataBlockNodes);
             result.Add(new TreeNode(metadataBlockNodes));
         }
 
