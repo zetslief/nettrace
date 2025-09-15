@@ -70,7 +70,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> _eventBlobs;
     private readonly ObservableAsPropertyHelper<Node> _timePoints;
 
-    public NettraceReaderViewModel(ILogger<NettraceReaderViewModel> logger)
+    public NettraceReaderViewModel(ILogger<NettraceReaderViewModel> logger, NettraceParser parser)
     {
         logger.LogInformation("{ViewModelType}  is created.", typeof(NettraceRecorderViewModel));
         WelcomeCommand = ReactiveCommand.Create(OnCommand);
@@ -86,6 +86,11 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
             .ToProperty(this, vm => vm.EventBlobs);
         _timePoints = this.WhenAnyValue(v => v.MetadataBlocks, v => v.EventBlocks, v => v.EventBlobs, ToLabeledRanges)
             .ToProperty(this, vm => vm.TimePoints);
+
+        parser.OnFileChanged += (s, e) =>
+        {
+            ReadFile(parser.GetFile() ?? throw new InvalidOperationException($"Failed to get nettrace file."));
+        };
     }
 
     public ICommand WelcomeCommand { get; }
@@ -139,7 +144,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
             return;
         }
 
-        var path = Path.GetFullPath(_filePath);
+        string path = Path.GetFullPath(_filePath);
 
         if (!File.Exists(path))
         {
@@ -149,16 +154,21 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
 
         using var stream = File.Open(path, FileMode.Open);
         var nettrace = NettraceReader.Read(stream);
-        _trace = nettrace.Trace;
-        _allEventBlobs = nettrace.EventBlocks
+        ReadFile(nettrace);
+        Status = $"Read {stream.Position} bytes";
+    }
+
+    private void ReadFile(NettraceFile file)
+    {
+        _trace = file.Trace;
+        _allEventBlobs = file.EventBlocks
             .SelectMany(block => block.EventBlobs)
             .Select(blob => new EventBlobViewModel(_trace, blob))
             .ToArray();
-        MetadataBlocks = nettrace.MetadataBlocks
+        MetadataBlocks = file.MetadataBlocks
             .Select(block => new MetadataBlockViewModel(_trace, block))
             .ToArray();
-        EventBlocks = nettrace.EventBlocks.Select(block => new EventBlockViewModel(_trace, block)).ToArray();
-        Status = $"Read {stream.Position} bytes";
+        EventBlocks = file.EventBlocks.Select(block => new EventBlockViewModel(_trace, block)).ToArray();
     }
 
     private Node ToLabeledRanges(

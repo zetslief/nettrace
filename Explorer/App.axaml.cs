@@ -29,8 +29,9 @@ public partial class App : Application
     {
         var serviceCollection = new ServiceCollection();
         serviceCollection.AddLogging(builder => builder.AddConsole());
-        serviceCollection.
-            AddSingleton<ViewLocator>()
+        serviceCollection.AddSingleton<NettraceParser>();
+        serviceCollection
+            .AddSingleton<ViewLocator>()
             .AddSingleton<Navigator>()
             .AddSingleton<MainWindowViewModel>();
         serviceCollection

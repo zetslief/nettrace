@@ -30,17 +30,19 @@ public class NettraceRecorderViewModel : ReactiveObject, IViewModel
 {
     private readonly ILogger<NettraceRecorderViewModel> _logger;
     private readonly Navigator _navigator;
+    private readonly NettraceParser _parser;
     private IEnumerable<ProcessViewModel>? _processes;
     private IEnumerable<ProcessViewModel>? _failedProcesses;
     private ProcessViewModel? _selectedProcess;
     private IEnumerable<EventProviderViewModel>? _eventProviders;
     private bool _openFileAutomatically = true;
 
-    public NettraceRecorderViewModel(ILogger<NettraceRecorderViewModel> logger, Navigator navigator)
+    public NettraceRecorderViewModel(ILogger<NettraceRecorderViewModel> logger, Navigator navigator, NettraceParser parser)
     {
         logger.LogInformation("{ViewModelType}  is created.", typeof(NettraceRecorderViewModel));
         _logger = logger;
         _navigator = navigator;
+        _parser = parser;
         RecordCommand = ReactiveCommand.Create(RecordAsync);
         RefreshCommand = ReactiveCommand.Create(Refresh);
 
@@ -120,7 +122,10 @@ public class NettraceRecorderViewModel : ReactiveObject, IViewModel
         _logger.LogInformation("{NettraceFile}", nettraceFile);
 
         if (_openFileAutomatically)
+        {
+            _parser.SetFile(nettraceFile);
             _navigator.NavigateToViewModel<NettraceReaderViewModel>();
+        }
     }
 
     private void Refresh()
