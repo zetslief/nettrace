@@ -117,13 +117,9 @@ public class NettraceRecorderViewModel : ReactiveObject, IViewModel
             return;
         }
 
-        using var stream = new MemoryStream(bytes);
-        var nettraceFile = NettraceReader.Read(stream);
-        _logger.LogInformation("{NettraceFile}", nettraceFile);
-
         if (_openFileAutomatically)
         {
-            _parser.SetFile(nettraceFile);
+            _parser.SetFile(bytes);
             _navigator.NavigateToViewModel<NettraceReaderViewModel>();
         }
     }

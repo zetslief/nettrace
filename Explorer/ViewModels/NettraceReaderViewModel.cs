@@ -6,7 +6,6 @@ using System.Reactive.Linq;
 using System.Windows.Input;
 using Explorer.Controls;
 using Microsoft.Extensions.Logging;
-using Nettrace;
 using ReactiveUI;
 using static Nettrace.Helpers;
 using static Nettrace.NettraceReader;
@@ -53,6 +52,7 @@ public class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob)
 
 public class NettraceReaderViewModel : ReactiveObject, IViewModel
 {
+    private readonly NettraceParser _parser;
     private string? _filePath = "./../traces/perf_with_work.nettrace";
     private string _status = string.Empty;
 
@@ -72,6 +72,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
 
     public NettraceReaderViewModel(ILogger<NettraceReaderViewModel> logger, NettraceParser parser)
     {
+        _parser = parser;
         logger.LogInformation("{ViewModelType}  is created.", typeof(NettraceRecorderViewModel));
         WelcomeCommand = ReactiveCommand.Create(OnCommand);
 
@@ -87,10 +88,8 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         _timePoints = this.WhenAnyValue(v => v.MetadataBlocks, v => v.EventBlocks, v => v.EventBlobs, ToLabeledRanges)
             .ToProperty(this, vm => vm.TimePoints);
 
-        parser.OnFileChanged += (s, e) =>
-        {
-            ReadFile(parser.GetFile() ?? throw new InvalidOperationException($"Failed to get nettrace file."));
-        };
+        _parser.OnFileChanged += (s, e)
+            => ReadFile(parser.GetFile() ?? throw new InvalidOperationException($"Failed to get nettrace file."));
     }
 
     public ICommand WelcomeCommand { get; }
@@ -152,10 +151,9 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
             return;
         }
 
-        using var stream = File.Open(path, FileMode.Open);
-        var nettrace = NettraceReader.Read(stream);
-        ReadFile(nettrace);
-        Status = $"Read {stream.Position} bytes";
+        byte[] bytes = File.ReadAllBytes(path);
+        _parser.SetFile(bytes);
+        Status = $"Read {bytes.Length} bytes";
     }
 
     private void ReadFile(NettraceFile file)
