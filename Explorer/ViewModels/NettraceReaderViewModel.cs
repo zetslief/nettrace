@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reactive.Linq;
 using System.Windows.Input;
 using Explorer.Controls;
+using Microsoft.Extensions.Logging;
 using Nettrace;
 using ReactiveUI;
 using static Nettrace.Helpers;
@@ -50,7 +51,7 @@ public class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob)
     public override string ToString() => Blob.ToString();
 }
 
-public class NettraceReaderViewModel : ReactiveObject
+public class NettraceReaderViewModel : ReactiveObject, IViewModel
 {
     private string? filePath = "./../traces/perf_with_work.nettrace";
     private string status = string.Empty;
@@ -69,8 +70,9 @@ public class NettraceReaderViewModel : ReactiveObject
     private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> eventBlobs;
     private readonly ObservableAsPropertyHelper<Node> timePoints;
 
-    public NettraceReaderViewModel()
+    public NettraceReaderViewModel(ILogger<NettraceReaderViewModel> logger)
     {
+        logger.LogInformation("{ViewModelType}  is created.", typeof(NettraceRecorderViewModel));
         WelcomeCommand = ReactiveCommand.Create(OnCommand);
 
         this.WhenAnyValue(v => v.MetadataBlocks)

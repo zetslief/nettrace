@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Explorer.Controls;
 using Ipc;
 using Microsoft.Extensions.Logging;
 using Nettrace;
@@ -25,18 +26,21 @@ public sealed class EventProviderViewModel(string name)
     public string Name { get; } = name;
 }
 
-public class NettraceRecorderViewModel : ReactiveObject
+public class NettraceRecorderViewModel : ReactiveObject, IViewModel
 {
     private readonly ILogger<NettraceRecorderViewModel> _logger;
+    private readonly Navigator _navigator;
     private IEnumerable<ProcessViewModel>? processes;
     private IEnumerable<ProcessViewModel>? failedProcesses;
     private ProcessViewModel? selectedProcess;
     private IEnumerable<EventProviderViewModel>? eventProviders;
     private bool _openFileAutomatically = true;
 
-    public NettraceRecorderViewModel(ILogger<NettraceRecorderViewModel> logger)
+    public NettraceRecorderViewModel(ILogger<NettraceRecorderViewModel> logger, Navigator navigator)
     {
+        logger.LogInformation("{ViewModelType}  is created.", typeof(NettraceRecorderViewModel));
         _logger = logger;
+        _navigator = navigator;
         RecordCommand = ReactiveCommand.Create(RecordAsync);
         RefreshCommand = ReactiveCommand.Create(Refresh);
 
@@ -75,7 +79,11 @@ public class NettraceRecorderViewModel : ReactiveObject
     public bool OpenFileAutomatically
     {
         get => _openFileAutomatically;
-        set => this.RaiseAndSetIfChanged(ref _openFileAutomatically, value);
+        set
+        {
+            if (this.RaiseAndSetIfChanged(ref _openFileAutomatically, value))
+                _navigator.NavigateToViewModel<NettraceReaderViewModel>();
+        }
     }
 
     private async Task RecordAsync()
@@ -110,6 +118,9 @@ public class NettraceRecorderViewModel : ReactiveObject
         using var stream = new MemoryStream(bytes);
         var nettraceFile = NettraceReader.Read(stream);
         _logger.LogInformation("{NettraceFile}", nettraceFile);
+
+        if (_openFileAutomatically)
+            _navigator.NavigateToViewModel<NettraceReaderViewModel>();
     }
 
     private void Refresh()

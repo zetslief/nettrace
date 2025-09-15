@@ -18,12 +18,12 @@
 
     <TabControl TabStripPlacement="Left" ItemsSource="{Binding ViewDescriptions}" SelectedItem="{Binding SelectedViewDescription}">
         <TabControl.ItemTemplate>
-            <DataTemplate DataType="{x:Type vm:ViewDescription}">
+            <DataTemplate DataType="{x:Type vm:ViewModelDescription}">
                 <TextBlock Text="{Binding Title}" />
             </DataTemplate>
         </TabControl.ItemTemplate>
         <TabControl.ContentTemplate>
-            <DataTemplate DataType="{x:Type vm:ViewDescription}">
+            <DataTemplate DataType="{x:Type vm:ViewModelDescription}">
                 <ContentControl Content="{Binding ViewModel}"/>
             </DataTemplate>
         </TabControl.ContentTemplate>
