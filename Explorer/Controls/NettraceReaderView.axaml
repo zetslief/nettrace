@@ -34,6 +34,8 @@
         <DataTemplate DataType="{x:Type vm:MetadataEventBlobViewModel}">
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding Payload.Header.EventId}"/>
+                    <TextBlock Text=" - "/>
                     <TextBlock Text="{Binding Payload.Header.ProviderName}"/>
                     <TextBlock Text=" - "/>
                     <TextBlock Text="{Binding Payload.Header.EventName}"/>
@@ -56,7 +58,7 @@
                     <TextBlock Text="{Binding Blob.SequenceNumber, StringFormat='Sequence Number: {0}'}"/>
                     <TextBlock Text="{Binding Blob.MetadataId, StringFormat='Metadata Id: {0}'}"/>
                     <TextBlock Text="{Binding Blob.CaptureThreadId, StringFormat='CaptureThreadId: {0}'}"/>
-                    <TextBlock Text="{Binding Timestamp, StringFormat='Timestamp: {0:dd/MM/yyyy HH:mm:ss.ffff}'}"/>
+                    <TextBlock Text="{Binding Timestamp, StringFormat='Timestamp: {0:HH:mm:ss.ffff}'}"/>
                 </StackPanel>
                 <DockPanel IsVisible="{Binding $parent[ListBoxItem].IsSelected}">
                     <TextBlock Text="{Binding}"
@@ -68,8 +70,8 @@
             <StackPanel>
                 <TextBlock Text="Event Block: "/>
                 <TextBlock Text="{Binding BlobCount, StringFormat='Event Blob Count: {0}'}"/>
-                <TextBlock Text="{Binding Header.MinTime, StringFormat='Min Timestamp: {0:dd/MM/yyyy HH:mm:ss.ffff}'}"/>
-                <TextBlock Text="{Binding Header.MinTime, StringFormat='Max Timestamp: {0:dd/MM/yyyy HH:mm:ss.ffff}'}"/>
+                <TextBlock Text="{Binding Header.MinTime, StringFormat='Min Timestamp: {0:HH:mm:ss.ffff}'}"/>
+                <TextBlock Text="{Binding Header.MaxTime, StringFormat='Max Timestamp: {0:HH:mm:ss.ffff}'}"/>
                 <TextBlock Text="{Binding Header.Duration, StringFormat='Duration: {0}'}"/>
             </StackPanel>
         </DataTemplate>
