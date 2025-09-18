@@ -60,6 +60,10 @@ foreach (var (thread, blobs) in threadStorage)
                     MemoryMarshal.Read<int>(blob.Payload.Bytes.Span[15..20]),
                     MemoryMarshal.Read<int>(blob.Payload.Bytes.Span[19..])
             ),
+            var name when name == TraceOperationRelation.Name => new TraceOperationRelation(
+                MemoryMarshal.Read<int>(blob.Payload.Bytes.Span[..4]),
+                MemoryMarshal.Read<int>(blob.Payload.Bytes.Span[3..8])
+            ),
             var name when name == ProcessInfo.Name => new ProcessInfo(
                 NettraceReader.ReadUnicode(blob.Payload.Bytes.Span, ref cursor),
                 NettraceReader.ReadUnicode(blob.Payload.Bytes.Span, ref cursor),
@@ -85,14 +89,7 @@ interface IEvent
    FieldV1 { TypeCode = 9, FieldName = TaskCreationOptions }
    FieldV1 { TypeCode = 9, FieldName = appDomain }
 */
-record TaskScheduled(
-    int OriginatingTaskSchedulerId,
-    int OriginatingTaskId,
-    int TaskId,
-    int CreatingTaskId,
-    int TaskCreationOptions,
-    int AppDomain
-) : IEvent
+record TaskScheduled(int OriginatingTaskSchedulerId, int OriginatingTaskId, int TaskId, int CreatingTaskId, int TaskCreationOptions, int AppDomain) : IEvent
 {
     public static string Name => nameof(TaskScheduled);
 }
@@ -105,13 +102,7 @@ record TaskScheduled(
     FieldV1 { TypeCode = 9, FieldName = Behavior }
     FieldV1 { TypeCode = 9, FieldName = ContinueWithTaskID }
 */
-record TaskWaitBegin(
-    int OriginatingTaskSchedulerId,
-    int OriginatingTaskId,
-    int TaskId,
-    int Behavior,
-    int ContinueWithTaskId
-) : IEvent
+record TaskWaitBegin(int OriginatingTaskSchedulerId, int OriginatingTaskId, int TaskId, int Behavior, int ContinueWithTaskId) : IEvent
 {
     public static string Name => nameof(TaskWaitBegin);
 }
@@ -122,13 +113,19 @@ record TaskWaitBegin(
     FieldV1 { TypeCode = 9, FieldName = OriginatingTaskID }
     FieldV1 { TypeCode = 9, FieldName = ContinueWithTaskId }
 */
-record AwaitTaskContinuationScheduled(
-    int OriginatingTaskSchedulerId,
-    int OriginatingTaskId,
-    int ContinueWithTaskId
-) : IEvent
+record AwaitTaskContinuationScheduled(int OriginatingTaskSchedulerId, int OriginatingTaskId, int ContinueWithTaskId) : IEvent
 {
     public static string Name => nameof(AwaitTaskContinuationScheduled);
+}
+
+/*
+ TraceOperationRelation 6 (2 fields):
+    FieldV1 { TypeCode = 9, FieldName = TaskID }
+    FieldV1 { TypeCode = 9, FieldName = Relation }
+ */
+record TraceOperationRelation(int TaskId, int Relation) : IEvent
+{
+    public static string Name => nameof(TraceOperationRelation);
 }
 
 /*

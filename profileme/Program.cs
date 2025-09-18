@@ -14,9 +14,18 @@ while (true)
 
 static async Task Work(int count)
 {
+    using CancellationTokenSource cts = new();
     for (int i = 0; i < count; ++i)
     {
-        await Task.Run(() => ProfileMe.Log.Tick(DateTime.Now));
+        await Task.Run(async () => { await Task.Yield(); ProfileMe.Log.Tick(DateTime.Now); });
+        try
+        {
+            var delay = Task.Delay(TimeSpan.FromSeconds(100), cts.Token);
+            cts.Cancel();
+            await delay;
+        }
+        catch (OperationCanceledException) { }
+
     }
 }
 
