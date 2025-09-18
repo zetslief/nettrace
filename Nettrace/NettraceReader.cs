@@ -600,7 +600,7 @@ public static class NettraceReader
     private static Guid ReadGuid(ReadOnlySpan<byte> bytes, ref int cursor)
         => MemoryMarshal.Read<Guid>(bytes[cursor..MoveBy(ref cursor, 16)]);
 
-    private static string ReadUnicode(ReadOnlySpan<byte> bytes, ref int cursor)
+    public static string ReadUnicode(ReadOnlySpan<byte> bytes, ref int cursor)
     {
         var startCursor = cursor;
         ReadOnlySpan<byte> nullBytes = [0, 0];
