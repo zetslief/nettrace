@@ -13,7 +13,10 @@ TODO:
 - TPL
     - [x] Parse basic events.
     - [ ] Move parsing logic into a separate project.
+    - [ ] `TaskWaitBegin.ContinueWithTaskId` might contain incorrect value.
 - Explorer
     - [ ] Create simple list of all events.
     - [ ] Group events by thread id.
     - [ ] Gropu events by task id.
+- Data parsing logic should be shared between the explrer and the nettrace lib.
+    - [ ] `NettraceReader.ReadUnicode` should be moved out.
