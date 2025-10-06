@@ -10,5 +10,10 @@ Useful links:
 * [CLR events: go for the nettrace file format!](https://chnasarre.medium.com/clr-events-go-for-the-nettrace-file-format-6b363364c2a3)
 
 TODO:
-1. Parse content of TPL provider.
-2. Render this content. So it is clear which events happened when.
+- TPL
+    - [x] Parse basic events.
+    - [ ] Move parsing logic into a separate project.
+- Explorer
+    - [ ] Create simple list of all events.
+    - [ ] Group events by thread id.
+    - [ ] Gropu events by task id.
