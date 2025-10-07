@@ -1,12 +1,22 @@
 ﻿using System.Diagnostics.Tracing;
 
-// using var listener = new TplEventListener();
+TplEventListener? listener = null;
+if (args.Length > 0)
+    listener = new TplEventListener();
 
-while (true)
+try
 {
-    await Task.Delay(TimeSpan.FromSeconds(5));
-    await Task.Yield();
+    while (true)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(5));
+        await Task.Yield();
+    }
 }
+finally
+{
+    listener?.Dispose();
+}
+
 
 public sealed class TplEventListener : EventListener
 {
@@ -18,11 +28,10 @@ public sealed class TplEventListener : EventListener
 
     protected override void OnEventWritten(EventWrittenEventArgs eventData)
     {
-        Console.WriteLine($"event: {eventData.EventSource.Name}_{eventData.EventName} {eventData}");
+        Console.WriteLine($"event: {eventData.EventSource.Name}_{eventData.EventName}");
         if (eventData.PayloadNames is not null)
-        {
-            Console.WriteLine($"\t {string.Join(',', eventData.PayloadNames)}");
-            Console.WriteLine($"\t {string.Join(',', eventData.Payload)}");
-        }
+            Console.WriteLine($"\t Names   : {string.Join(',', eventData.PayloadNames)}");
+        if (eventData.Payload is not null)
+            Console.WriteLine($"\t Payloads: {string.Join(',', eventData.Payload)}");
     }
 }

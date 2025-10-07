@@ -1,5 +1,4 @@
-﻿using System.Runtime.InteropServices;
-using Nettrace;
+﻿using Nettrace;
 using Nettrace.PayloadParsers;
 
 using var stream = new MemoryStream(File.ReadAllBytes("./traces/tpleventsource_profileme.nettrace"));
