@@ -1,47 +1,28 @@
-﻿using System.Diagnostics;
-using System.Diagnostics.Tracing;
+﻿using System.Diagnostics.Tracing;
 
-var delay = TimeSpan.FromMilliseconds(10);
-int index = 0;
+// using var listener = new TplEventListener();
 
 while (true)
 {
-    var time = DateTime.Now;
-    ProfileMe.Log.Tick(time);
-    Console.WriteLine($"{index++} : {time}");
-    await Work(10000);
-    await Task.Delay(delay).ConfigureAwait(false);
+    await Task.Delay(TimeSpan.FromSeconds(5));
+    await Task.Yield();
 }
 
-static async Task Work(int count)
+public sealed class TplEventListener : EventListener
 {
-    using CancellationTokenSource cts = new();
-    for (int i = 0; i < count; ++i)
+    protected override void OnEventSourceCreated(EventSource eventSource)
     {
-        await Task.Run(async () => { await Task.Yield(); ProfileMe.Log.Tick(DateTime.Now); });
-        var stopwatch = Stopwatch.StartNew();
-        try
-        {
-            var delay = Task.Delay(TimeSpan.FromSeconds(100), cts.Token);
-            var background = Task.Run(async () => await Task.Delay(TimeSpan.FromSeconds(200000)));
-            await Task.Delay(TimeSpan.FromSeconds(0.01));
-            cts.Cancel();
-            await delay;
-            await background;
-        }
-        catch (OperationCanceledException e)
-        {
-            Console.WriteLine($"{stopwatch.Elapsed} Exception: {e}");
-        }
-
+        if (eventSource.Name == "System.Threading.Tasks.TplEventSource")
+            EnableEvents(eventSource, EventLevel.Verbose, EventKeywords.All);
     }
-}
 
-[EventSource(Name = "ProfileMe")]
-public class ProfileMe : EventSource
-{
-    public static ProfileMe Log { get; } = new();
-
-    [Event(1)]
-    public void Tick(DateTime time) => WriteEvent(1, time);
+    protected override void OnEventWritten(EventWrittenEventArgs eventData)
+    {
+        Console.WriteLine($"event: {eventData.EventSource.Name}_{eventData.EventName} {eventData}");
+        if (eventData.PayloadNames is not null)
+        {
+            Console.WriteLine($"\t {string.Join(',', eventData.PayloadNames)}");
+            Console.WriteLine($"\t {string.Join(',', eventData.Payload)}");
+        }
+    }
 }

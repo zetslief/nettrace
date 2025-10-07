@@ -12,7 +12,8 @@ Useful links:
 TODO:
 - TPL
     - [x] Parse basic events.
-    - [ ] Move parsing logic into a separate project.
+    - [x] Move parsing logic into a separate project.
+    - [ ] Build tests to trigger specific TPL events.
     - [ ] `TaskWaitBegin.ContinueWithTaskId` might contain incorrect value.
 - Explorer
     - [ ] Create simple list of all events.
