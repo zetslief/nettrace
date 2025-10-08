@@ -32,6 +32,44 @@ public static class TplParser
         MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))])
     );
 
+    public static NewId ParseNewId(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))])
+    );
+
+    public static TraceSynchronousWorkBegin ParseTraceSynchronousWorkBegin(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))]),
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))])
+    );
+
+    public static TraceSynchronousWorkEnd ParseTraceSynchronousWorkEnd(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))])
+    );
+
+    public static TraceOperationEnd ParseTraceOperationEnd(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))]),
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))])
+    );
+
+    public static TaskWaitContinuationStarted ParseTaskWaitContinuationStarted(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))])
+    );
+
+    public static TraceOperationBegin ParseTraceOperationBegin(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))]),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(long))])
+    );
+
+    public static TaskWaitContinuationComplete ParseTaskWaitContinuationComplete(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))])
+    );
+
+    public static TaskWaitEnd ParseTaskWaitEnd(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))]),
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))]),
+        MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))])
+    );
+
     private static int MoveBy(ref int value, int by)
     {
         value += by;

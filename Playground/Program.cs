@@ -40,6 +40,14 @@ foreach (var (thread, blobs) in threadStorage)
         ReadOnlySpan<byte> payloadBytes = blob.Payload.Bytes.Span;
         IEvent @event = metadata.Header.EventName switch
         {
+            var name when name == NewId.Name => TplParser.ParseNewId(payloadBytes),
+            var name when name == TraceSynchronousWorkBegin.Name => TplParser.ParseTraceSynchronousWorkBegin(payloadBytes),
+            var name when name == TraceSynchronousWorkEnd.Name => TplParser.ParseTraceSynchronousWorkEnd(payloadBytes),
+            var name when name == TaskWaitContinuationStarted.Name => TplParser.ParseTaskWaitContinuationStarted(payloadBytes),
+            var name when name == TraceOperationEnd.Name => TplParser.ParseTraceOperationEnd(payloadBytes),
+            var name when name == TraceOperationBegin.Name => TplParser.ParseTraceOperationBegin(payloadBytes),
+            var name when name == TaskWaitContinuationComplete.Name => TplParser.ParseTaskWaitContinuationComplete(payloadBytes),
+            var name when name == TaskWaitEnd.Name => TplParser.ParseTaskWaitEnd(payloadBytes),
             var name when name == TaskWaitBegin.Name => TplParser.ParseTaskWaitBegin(payloadBytes),
             var name when name == AwaitTaskContinuationScheduled.Name => TplParser.ParseAwaitTaskContinuation(payloadBytes),
             var name when name == TaskScheduled.Name => TplParser.ParseTaskScheduled(payloadBytes),
