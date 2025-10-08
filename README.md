@@ -19,5 +19,7 @@ TODO:
     - [ ] Create simple list of all events.
     - [ ] Group events by thread id.
     - [ ] Gropu events by task id.
+- profileme:
+    - [ ] Add mode that allows synchronized start - to capture full trace.
 - Data parsing logic should be shared between the explrer and the nettrace lib.
     - [ ] `NettraceReader.ReadUnicode` should be moved out.
