@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
+using Avalonia;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
@@ -43,7 +45,7 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
         foreach (var (camera, node) in items)
             Render(camera, canvas, node);
 
-        Console.WriteLine($"Render: {stopwatch.Elapsed.TotalMilliseconds} ms");
+        // Console.WriteLine($"Render: {stopwatch.Elapsed.TotalMilliseconds} ms");
 
         canvas.Restore();
     }
@@ -54,20 +56,13 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
 
     private static void Render(Camera2D camera, SKCanvas canvas, Node item)
     {
-        static bool IsPointInView(Camera2D camera, Position position) => camera.IsInView(position);
-        static bool IsRectangleInView(Camera2D camera, Rect rect)
-            => IsPointInView(camera, new(rect.Left, rect.Top))
-                && IsPointInView(camera, new(rect.Right, rect.Top))
-                && IsPointInView(camera, new(rect.Left, rect.Bottom))
-                && IsPointInView(camera, new(rect.Right, rect.Bottom));
-
         switch (item)
         {
             case Rectangle rectangle:
-                if (IsRectangleInView(camera, rectangle.Rect)) RenderRectangle(camera, canvas, rectangle);
+                RenderRectangle(camera, canvas, rectangle);
                 break;
             case Point point:
-                if (IsPointInView(camera, point.Position)) RenderPoint(camera, canvas, point);
+                RenderPoint(camera, canvas, point);
                 break;
             case TreeNode stacked:
                 foreach (var collection in stacked.Children)
@@ -82,7 +77,7 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
 
     private static void RenderPoint(Camera2D camera, SKCanvas canvas, Point point)
     {
-        var position = camera.ToViewPosition(point.Position);
+        var position = camera.LocalToWorld(point.Position);
 
         canvas.DrawLine(
             position.X, position.Y - 15, position.X, position.Y,
@@ -91,8 +86,8 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
 
     private static void RenderRectangle(Camera2D camera, SKCanvas canvas, Rectangle item)
     {
-        var (fromX, fromY) = camera.ToViewPosition(new(item.Rect.Left, item.Rect.Top));
-        var (toX, toY) = camera.ToViewPosition(new(item.Rect.Right, item.Rect.Bottom));
+        var (fromX, fromY) = camera.LocalToWorld(new(item.Rect.Left, item.Rect.Top));
+        var (toX, toY) = camera.LocalToWorld(new(item.Rect.Left, item.Rect.Top));
 
         SKRect rect = new(fromX, fromY, toX, toY);
 
@@ -112,39 +107,40 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
 
     private static Node TranslateUiNode(Camera2D camera, Node node) => node switch
     {
-        Point point => new Point(camera.FromViewPosition(point.Position), point.Color),
+        Point point => new Point(camera.LocalToWorld(point.Position), point.Color),
         Rectangle rect => new Rectangle(Rect.FromPositions(
-            camera.FromViewPosition(new(rect.Rect.Left, rect.Rect.Top)),
-            camera.FromViewPosition(new(rect.Rect.Right, rect.Rect.Bottom))),
+            camera.WorldToLocal(new(rect.Rect.Left, rect.Rect.Top)),
+            camera.WorldToLocal(new(rect.Rect.Right, rect.Rect.Bottom))),
             rect.Color),
         _ => node,
     };
 }
 
-public sealed class Camera2D(Position position, Rect data, Rect view)
+public sealed class Camera2D
 {
-    private readonly Rect view = view;
+    private readonly Matrix4x4 _matrix;
+    private readonly Matrix4x4 _inverse;
+    private readonly Matrix4x4 _scale;
 
-    public Position Position { get; } = position;
-    public float Width { get; } = data.Width;
-    public float Height { get; } = data.Height;
-
-    public Position ToViewPosition(Position position)
-        => new((position.X - data.Left) / Width * view.Width, (position.Y - data.Top) / Height * view.Height);
-
-    public Position FromViewPosition(Position position)
-        => new(position.X / view.Width * data.Width + data.Left, position.Y / view.Height * data.Height + data.Top);
-
-    public bool IsInView(Position position)
+    public Camera2D(Vector3 position, Vector3 scale, Size size)
     {
-        var (x, y) = ToViewPosition(position);
-        return x >= view.Left && x <= view.Right && y >= view.Top && y <= view.Bottom;
+        _matrix = Matrix4x4.CreateOrthographic(size.X, size.Y, -1, 1) * Matrix4x4.CreateTranslation(position);
+        Matrix4x4.Invert(_matrix, out _inverse);
+        _scale = Matrix4x4.CreateScale(scale);
     }
+
+    public Position LocalToWorld(Position position)
+        => Position.FromTranslation(_matrix * Matrix4x4.CreateTranslation(position.X, position.Y, 0) * _scale);
+
+    public Position WorldToLocal(Position position)
+        => Position.FromTranslation(_inverse * Matrix4x4.CreateTranslation(new(position.X, position.Y, 0)));
 }
 
 public readonly record struct Position(float X, float Y)
 {
     public static Position Zero { get; } = new(0, 0);
+
+    public static Position FromTranslation(Matrix4x4 m) => new(m.Translation.X, m.Translation.Y);
 }
 
 public readonly record struct Rect(float Left, float Top, float Right, float Bottom)
@@ -158,6 +154,8 @@ public readonly record struct Rect(float Left, float Top, float Right, float Bot
     public override string ToString()
         => $"Rect({Left}, {Top}, {Right}, {Bottom}) | Width {Width} | Height {Height}";
 }
+
+public readonly record struct Size(float X, float Y);
 
 public static class Converters
 {

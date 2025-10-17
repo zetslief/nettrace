@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
@@ -53,14 +54,17 @@ public sealed class TimespanControl : Control
             (null, null) => []
         });
 
-        var uiCamera = new Camera2D(Position.Zero, Bounds.Into(), Bounds.Into());
+        var uiCamera = new Camera2D(Vector3.Zero, Vector3.One, new((float)Bounds.Width, (float)Bounds.Height));
 
         Stack<(Camera2D, Node)> renderItems = [];
         renderItems.Push((uiCamera, uiNode));
 
         if (dataNode is not null)
         {
-            var dataCamera = new Camera2D(Position.Zero, viewport ?? dataBounds, Bounds.Into());
+            var dataCamera = new Camera2D(
+                new(-dataBounds.Left, dataBounds.Top, 0),
+                new((float)Bounds.Width / dataBounds.Width, (float)Bounds.Height / dataBounds.Height, 1),
+                new((float)Bounds.Width, (float)Bounds.Height));
             renderItems.Push((dataCamera, dataNode));
         }
 
@@ -79,10 +83,10 @@ public sealed class TimespanControl : Control
 
         Debug.Assert(pressed is not null);
         current = e.GetPosition(this).Into();
-        var currentCamera = new Camera2D(Position.Zero, viewport ?? dataBounds, Bounds.Into());
-        var pressedView = currentCamera.FromViewPosition(pressed.Value);
-        var currentView = currentCamera.FromViewPosition(current.Value);
-        viewport = (viewport ?? new Rect()) with { Left = pressedView.X, Right = currentView.X };
+        // var currentCamera = new Camera2D(Position.Zero, viewport ?? dataBounds, Bounds.Into());
+        // var pressedView = currentCamera.FromViewPosition(pressed.Value);
+        // var currentView = currentCamera.FromViewPosition(current.Value);
+        // viewport = (viewport ?? new Rect()) with { Left = pressedView.X, Right = currentView.X };
         Console.WriteLine($"Viewport is updated: {viewport}");
         pressed = current = null;
         Dispatcher.UIThread.InvokeAsync(InvalidateVisual, DispatcherPriority.Background);
