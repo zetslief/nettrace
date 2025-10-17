@@ -87,7 +87,7 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
     private static void RenderRectangle(Camera2D camera, SKCanvas canvas, Rectangle item)
     {
         var (fromX, fromY) = camera.LocalToWorld(new(item.Rect.Left, item.Rect.Top));
-        var (toX, toY) = camera.LocalToWorld(new(item.Rect.Left, item.Rect.Top));
+        var (toX, toY) = camera.LocalToWorld(new(item.Rect.Right, item.Rect.Bottom));
 
         SKRect rect = new(fromX, fromY, toX, toY);
 
@@ -138,8 +138,6 @@ public sealed class Camera2D
 
 public readonly record struct Position(float X, float Y)
 {
-    public static Position Zero { get; } = new(0, 0);
-
     public static Position FromTranslation(Matrix4x4 m) => new(m.Translation.X, m.Translation.Y);
 }
 
