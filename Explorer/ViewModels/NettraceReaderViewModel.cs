@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
-using System.Reactive.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Platform.Storage;
-using Explorer.Controls;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
 using static Nettrace.Helpers;
@@ -62,17 +61,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
 
     private Trace? _trace;
 
-    private IReadOnlyCollection<MetadataBlockViewModel>? _metadataBlocks = null;
-    private MetadataBlockViewModel? _selectedMetadataBlock = null;
-
-    private IReadOnlyCollection<EventBlockViewModel>? _eventBlocks = null;
-
-    private readonly ObservableAsPropertyHelper<IEnumerable<MetadataEventBlobViewModel>?> _metadataEventBlobs;
-    private MetadataEventBlobViewModel? _selectedMetadataEventBlob = null;
-    private EventBlobViewModel[]? _allEventBlobs;
-
-    private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> _eventBlobs;
-    private readonly ObservableAsPropertyHelper<Node> _timePoints;
+    private ImmutableArray<EventBlobViewModel>? _allEventBlobs;
 
     public NettraceReaderViewModel(ILogger<NettraceReaderViewModel> logger, NettraceParser parser, IStorageProvider storageProvider)
     {
@@ -81,18 +70,6 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         _storageProvider = storageProvider;
         ReadFileCommand = ReactiveCommand.Create(OnFileRead);
         BrowseFileCommand = ReactiveCommand.Create(OnFileBrowseAsync);
-
-        this.WhenAnyValue(v => v.MetadataBlocks)
-            .Select(MetadataBlockViewModel? (m) => null)
-            .ToProperty(this, vm => vm.SelectedMetadataBlock);
-        _metadataEventBlobs = this.WhenAnyValue(x => x.SelectedMetadataBlock)
-            .Select(metadataBlock => metadataBlock?.Blobs)
-            .ToProperty(this, vm => vm.MetadataEventBlobs);
-        _eventBlobs = this.WhenAnyValue(x => x.SelectedMetadataEventBlob)
-            .Select(blob => _allEventBlobs?.Where(eb => eb.Blob.MetadataId == blob?.Payload.Header.MetaDataId).ToArray())
-            .ToProperty(this, vm => vm.EventBlobs);
-        _timePoints = this.WhenAnyValue(v => v.MetadataBlocks, v => v.EventBlocks, v => v.EventBlobs, ToLabeledRanges)
-            .ToProperty(this, vm => vm.TimePoints);
 
         _parser.OnFileChanged += (s, e)
             => ReadFile(parser.GetFile() ?? throw new InvalidOperationException($"Failed to get nettrace file."));
@@ -108,35 +85,11 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         set => this.RaiseAndSetIfChanged(ref _filePath, value);
     }
 
-    public IReadOnlyCollection<MetadataBlockViewModel>? MetadataBlocks
+    public ImmutableArray<EventBlobViewModel>? AllEventBlobs
     {
-        get => _metadataBlocks;
-        private set => this.RaiseAndSetIfChanged(ref _metadataBlocks, value);
+        get => _allEventBlobs;
+        set => this.RaiseAndSetIfChanged(ref _allEventBlobs, value);
     }
-
-    public MetadataBlockViewModel? SelectedMetadataBlock
-    {
-        get => _selectedMetadataBlock;
-        set => this.RaiseAndSetIfChanged(ref _selectedMetadataBlock, value);
-    }
-
-    public IReadOnlyCollection<EventBlockViewModel>? EventBlocks
-    {
-        get => this._eventBlocks;
-        set => this.RaiseAndSetIfChanged(ref _eventBlocks, value);
-    }
-
-    public IEnumerable<MetadataEventBlobViewModel>? MetadataEventBlobs => _metadataEventBlobs.Value;
-
-    public MetadataEventBlobViewModel? SelectedMetadataEventBlob
-    {
-        get => _selectedMetadataEventBlob;
-        set => this.RaiseAndSetIfChanged(ref _selectedMetadataEventBlob, value);
-    }
-
-    public IReadOnlyCollection<EventBlobViewModel>? EventBlobs => _eventBlobs.Value;
-
-    public Node TimePoints => _timePoints.Value;
 
     public string Status
     {
@@ -183,76 +136,9 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     private void ReadFile(NettraceFile file)
     {
         _trace = file.Trace;
-        _allEventBlobs = file.EventBlocks
+        _allEventBlobs = [.. file.EventBlocks
             .SelectMany(block => block.EventBlobs)
             .Select(blob => new EventBlobViewModel(_trace, blob))
-            .ToArray();
-        MetadataBlocks = file.MetadataBlocks
-            .Select(block => new MetadataBlockViewModel(_trace, block))
-            .ToArray();
-        EventBlocks = file.EventBlocks.Select(block => new EventBlockViewModel(_trace, block)).ToArray();
+        ];
     }
-
-    private Node ToLabeledRanges(
-        IReadOnlyCollection<MetadataBlockViewModel>? metadataBlocks,
-        IReadOnlyCollection<EventBlockViewModel>? eventBlocks,
-        IReadOnlyCollection<EventBlobViewModel>? eventBlobs)
-    {
-        var result = new List<Node>();
-
-        if (eventBlobs?.Count > 0)
-        {
-            var eventBlobNodes = new List<Node>();
-            BlobsToRanges(_trace!, eventBlobs, eventBlobNodes);
-            result.Add(new TreeNode(eventBlobNodes));
-        }
-
-        if (eventBlocks?.Count > 0)
-        {
-            var eventBlockNodes = new List<Node>();
-            EventBlocksToRanges(_trace!, eventBlocks, eventBlockNodes);
-            result.Add(new TreeNode(eventBlockNodes));
-        }
-
-        if (metadataBlocks?.Count > 0)
-        {
-            var metadataBlockNodes = new List<Node>();
-            MetadataBlocksToRanges(_trace!, metadataBlocks, metadataBlockNodes);
-            result.Add(new TreeNode(metadataBlockNodes));
-        }
-
-        return new TreeNode(result);
-    }
-
-    private static void MetadataBlocksToRanges(
-        Trace trace,
-        IReadOnlyCollection<MetadataBlockViewModel> metadataBlocks,
-        List<Node> result)
-    {
-        result.AddRange(metadataBlocks
-            .OrderBy(block => block.Header.MinTime)
-            .Select(block => new Rectangle(new(ToSeconds(block.Header.MinTime), 0, ToSeconds(block.Header.MaxTime), 1), Avalonia.Media.Colors.Red)));
-    }
-
-    private static void EventBlocksToRanges(
-        Trace trace,
-        IReadOnlyCollection<EventBlockViewModel> metadataBlocks,
-        List<Node> result)
-    {
-        result.AddRange(metadataBlocks
-            .OrderBy(block => block.Header.MinTime)
-            .Select(block => new Rectangle(new(ToSeconds(block.Header.MinTime), 1, ToSeconds(block.Header.MaxTime), 2), Avalonia.Media.Colors.Blue)));
-    }
-
-    private static void BlobsToRanges(Trace trace, IReadOnlyCollection<EventBlobViewModel> blobs, List<Node> output)
-    {
-        foreach (var blob in blobs)
-        {
-            var currentTime = QpcToUtc(trace, blob.Blob.TimeStamp);
-            output.Add(new Point(new(ToSeconds(currentTime), 2.1f), Avalonia.Media.Colors.Green));
-        }
-    }
-
-    private static float ToSeconds(DateTime dateTime)
-        => (float)((dateTime - dateTime.Date).Ticks / 10_000_000d);
 }

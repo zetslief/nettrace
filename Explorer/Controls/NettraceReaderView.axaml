@@ -86,33 +86,11 @@
                 Content="Browse"/>
             <TextBlock Text="{Binding Status}"/>
         </DockPanel>
-        <Grid ColumnDefinitions="2*,2*,6*,2*">
-            <DockPanel Grid.Column="0">
-                <TextBlock Text="Metadata Blocks"
-                    DockPanel.Dock="Top"/>
-                <ListBox ItemsSource="{Binding MetadataBlocks}"
-                    SelectedItem="{Binding SelectedMetadataBlock}"
-                    SelectionMode="Single" />
-            </DockPanel>
-            <DockPanel Grid.Column="1">
-                <TextBlock Text="Metadata Blobs"
-                    DockPanel.Dock="Top"/>
-                <ListBox ItemsSource="{Binding MetadataEventBlobs}"
-                    SelectedItem="{Binding SelectedMetadataEventBlob}"
-                    SelectionMode="Single" />
-            </DockPanel>
-            <DockPanel Grid.Column="2">
-                <TextBlock Text="Event Blobs"
-                    DockPanel.Dock="Top"/>
-                <ListBox ItemsSource="{Binding EventBlobs}"
-                    SelectionMode="Single" />
-            </DockPanel>
-            <DockPanel Grid.Column="3">
-                <TextBlock Text="Event Blocks"
-                    DockPanel.Dock="Top"/>
-                <ListBox ItemsSource="{Binding EventBlocks}"
-                    SelectionMode="Single" />
-            </DockPanel>
-        </Grid>
+        <DockPanel>
+            <TextBlock Text="Event Blobs"
+                DockPanel.Dock="Top"/>
+            <ListBox ItemsSource="{Binding AllEventBlobs}"
+                SelectionMode="Single" />
+        </DockPanel>
     </DockPanel>
 </UserControl>
