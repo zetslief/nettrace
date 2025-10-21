@@ -40,12 +40,8 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
 
         canvas.Clear(SKColors.Black);
 
-        var stopwatch = Stopwatch.StartNew();
-
         foreach (var (camera, node) in items)
             Render(camera, canvas, node);
-
-        // Console.WriteLine($"Render: {stopwatch.Elapsed.TotalMilliseconds} ms");
 
         canvas.Restore();
     }
@@ -101,19 +97,6 @@ internal sealed class TimespanDrawOperation(Avalonia.Rect bounds, IEnumerable<(C
             toX, fromY, 2,
             new() { Style = SKPaintStyle.Fill, Color = item.Color.Into() });
     }
-
-    private static IEnumerable<Node> TranslateUiNode(Camera2D camera, IEnumerable<Node> nodes)
-        => nodes.Select(node => TranslateUiNode(camera, node));
-
-    private static Node TranslateUiNode(Camera2D camera, Node node) => node switch
-    {
-        Point point => new Point(camera.LocalToWorld(point.Position), point.Color),
-        Rectangle rect => new Rectangle(Rect.FromPositions(
-            camera.WorldToLocal(new(rect.Rect.Left, rect.Rect.Top)),
-            camera.WorldToLocal(new(rect.Rect.Right, rect.Rect.Bottom))),
-            rect.Color),
-        _ => node,
-    };
 }
 
 public sealed class Camera2D
