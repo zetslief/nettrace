@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
@@ -7,47 +6,19 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Platform.Storage;
 using Microsoft.Extensions.Logging;
+using Nettrace;
 using ReactiveUI;
 using static Nettrace.Helpers;
 using static Nettrace.NettraceReader;
 
 namespace Explorer.ViewModels;
 
-public class MetadataBlockViewModel(Trace trace, Block<MetadataEvent> metadata)
-{
-    public BlockHeaderViewModel Header { get; } = new(trace, metadata.Header);
-
-    public IReadOnlyCollection<MetadataEventBlobViewModel> Blobs { get; } = metadata.EventBlobs
-        .Select(b => new MetadataEventBlobViewModel(b))
-        .ToArray();
-}
-
-public class MetadataEventBlobViewModel(EventBlob<MetadataEvent> blob)
-{
-    public EventBlob<MetadataEvent> Blob { get; } = blob;
-    public MetadataEvent Payload { get; } = blob.Payload;
-
-    public override string ToString() => Blob.ToString();
-}
-
-public sealed class BlockHeaderViewModel(Trace trace, Header header)
-{
-    public DateTime MinTime => QpcToUtc(trace, header.MinTimestamp);
-    public DateTime MaxTime => QpcToUtc(trace, header.MaxTimestamp);
-    public TimeSpan Duration => MaxTime - MinTime;
-}
-
-public sealed class EventBlockViewModel(Trace trace, Block<Event> block)
-{
-    public BlockHeaderViewModel Header { get; } = new(trace, block.Header);
-    public int BlobCount => block.EventBlobs.Length;
-    public override string ToString() => block.ToString();
-}
-
-public class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob)
+public class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, EventBlob<MetadataEvent> metadata)
 {
     public EventBlob<Event> Blob => eventBlob;
     public DateTime Timestamp => QpcToUtc(trace, eventBlob.TimeStamp);
+    public int EventId => metadata.Payload.Header.EventId;
+    public string EventName => metadata.Payload.Header.EventName;
     public override string ToString() => Blob.ToString();
 }
 
@@ -136,9 +107,11 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     private void ReadFile(NettraceFile file)
     {
         _trace = file.Trace;
+        var metadataCache = file.BuildMetadataCache();
         _allEventBlobs = [.. file.EventBlocks
             .SelectMany(block => block.EventBlobs)
-            .Select(blob => new EventBlobViewModel(_trace, blob))
+            .Where(blob => blob.MetadataId != 0)
+            .Select(blob => new EventBlobViewModel(_trace, blob, metadataCache[blob.MetadataId]))
         ];
     }
 }
