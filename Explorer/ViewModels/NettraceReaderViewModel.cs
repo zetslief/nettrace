@@ -108,9 +108,17 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     {
         _trace = file.Trace;
         var metadataCache = file.BuildMetadataCache();
-        _allEventBlobs = [.. file.EventBlocks
+        bool metadataIsIncomplete = false;
+        foreach (var blob in file.EventBlocks.SelectMany(block => block.EventBlobs))
+        {
+            if (!metadataCache.ContainsKey(blob.MetadataId))
+            {
+                _logger.LogError("{Blob} does not have corresponding metadata id.", blob);
+                metadataIsIncomplete = true;
+            }
+        }
+        AllEventBlobs = metadataIsIncomplete ? [] : [.. file.EventBlocks
             .SelectMany(block => block.EventBlobs)
-            .Where(blob => blob.MetadataId != 0)
             .Select(blob => new EventBlobViewModel(_trace, blob, metadataCache[blob.MetadataId]))
         ];
     }
