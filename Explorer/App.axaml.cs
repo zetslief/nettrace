@@ -1,8 +1,10 @@
 using System;
 using System.Reactive;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Explorer.Controls;
 using Explorer.ViewModels;
@@ -37,12 +39,14 @@ public partial class App : Application
         serviceCollection
             .AddViewModel<NettraceReaderViewModel, NettraceReaderView>("Read")
             .AddViewModel<NettraceRecorderViewModel, NettraceRecorderView>("Record");
-        var serviceProvider = serviceCollection.BuildServiceProvider();
-        var viewModel = serviceProvider.GetRequiredService<MainWindowViewModel>();
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            var mainWindow = new MainWindow();
+            serviceCollection.AddSingleton<IStorageProvider>(_ => mainWindow.StorageProvider);
+            var serviceProvider = serviceCollection.BuildServiceProvider();
             DataTemplates.Add(serviceProvider.GetRequiredService<ViewLocator>());
-            desktop.MainWindow = new MainWindow() { DataContext = viewModel };
+            desktop.MainWindow = mainWindow;
+            mainWindow.DataContext = serviceProvider.GetRequiredService<MainWindowViewModel>();
         }
 
         base.OnFrameworkInitializationCompleted();

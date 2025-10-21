@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reactive.Linq;
+using System.Threading.Tasks;
 using System.Windows.Input;
+using Avalonia.Platform.Storage;
 using Explorer.Controls;
 using Microsoft.Extensions.Logging;
 using ReactiveUI;
@@ -52,7 +54,9 @@ public class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob)
 
 public class NettraceReaderViewModel : ReactiveObject, IViewModel
 {
+    private readonly ILogger<NettraceReaderViewModel> _logger;
     private readonly NettraceParser _parser;
+    private readonly IStorageProvider _storageProvider;
     private string? _filePath = "./../traces/perf_with_work.nettrace";
     private string _status = string.Empty;
 
@@ -70,11 +74,13 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     private readonly ObservableAsPropertyHelper<IReadOnlyCollection<EventBlobViewModel>?> _eventBlobs;
     private readonly ObservableAsPropertyHelper<Node> _timePoints;
 
-    public NettraceReaderViewModel(ILogger<NettraceReaderViewModel> logger, NettraceParser parser)
+    public NettraceReaderViewModel(ILogger<NettraceReaderViewModel> logger, NettraceParser parser, IStorageProvider storageProvider)
     {
+        _logger = logger;
         _parser = parser;
-        logger.LogInformation("{ViewModelType}  is created.", typeof(NettraceRecorderViewModel));
+        _storageProvider = storageProvider;
         ReadFileCommand = ReactiveCommand.Create(OnFileRead);
+        BrowseFileCommand = ReactiveCommand.Create(OnFileBrowseAsync);
 
         this.WhenAnyValue(v => v.MetadataBlocks)
             .Select(MetadataBlockViewModel? (m) => null)
@@ -90,9 +96,11 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
 
         _parser.OnFileChanged += (s, e)
             => ReadFile(parser.GetFile() ?? throw new InvalidOperationException($"Failed to get nettrace file."));
+        _logger.LogInformation("{ViewModelType}  is created.", typeof(NettraceRecorderViewModel));
     }
 
     public ICommand ReadFileCommand { get; }
+    public ICommand BrowseFileCommand { get; }
 
     public string? FilePath
     {
@@ -134,6 +142,24 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     {
         get => _status;
         private set => this.RaiseAndSetIfChanged(ref _status, value);
+    }
+
+    private async Task OnFileBrowseAsync()
+    {
+        var startFolder = await _storageProvider.TryGetFolderFromPathAsync(Environment.CurrentDirectory).ConfigureAwait(true);
+        _logger.LogInformation("Opening file picker at folder: {StartFolder}", startFolder?.TryGetLocalPath());
+        var result = await _storageProvider.OpenFilePickerAsync(new()
+        {
+            Title = "Select nettrace file",
+            AllowMultiple = false,
+            SuggestedStartLocation = startFolder,
+            FileTypeFilter = [new("nettrace") { Patterns = ["*.nettrace"] }, new("all") { Patterns = ["*.*"] }]
+        }).ConfigureAwait(true);
+        if (result.Count != 1) return;
+        string? localPath = result[0].TryGetLocalPath();
+        if (string.IsNullOrEmpty(localPath)) return;
+        FilePath = localPath;
+        OnFileRead();
     }
 
     private void OnFileRead()
