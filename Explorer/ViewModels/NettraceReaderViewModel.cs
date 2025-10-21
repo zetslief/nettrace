@@ -7,6 +7,7 @@ using System.Windows.Input;
 using Avalonia.Platform.Storage;
 using Microsoft.Extensions.Logging;
 using Nettrace;
+using Nettrace.PayloadParsers;
 using ReactiveUI;
 using static Nettrace.Helpers;
 using static Nettrace.NettraceReader;
@@ -17,9 +18,26 @@ public class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, EventBl
 {
     public EventBlob<Event> Blob => eventBlob;
     public DateTime Timestamp => QpcToUtc(trace, eventBlob.TimeStamp);
-    public int EventId => metadata.Payload.Header.EventId;
-    public string EventName => metadata.Payload.Header.EventName;
+    public IEvent? Event { get; } = GenericTplParser(metadata.Payload.Header.EventName, eventBlob.Payload.Bytes.Span);
     public override string ToString() => Blob.ToString();
+
+    private static IEvent? GenericTplParser(string eventName, ReadOnlySpan<byte> payloadBytes) => eventName switch
+    {
+        var name when name == NewId.Name => TplParser.ParseNewId(payloadBytes),
+        var name when name == TraceSynchronousWorkBegin.Name => TplParser.ParseTraceSynchronousWorkBegin(payloadBytes),
+        var name when name == TraceSynchronousWorkEnd.Name => TplParser.ParseTraceSynchronousWorkEnd(payloadBytes),
+        var name when name == TaskWaitContinuationStarted.Name => TplParser.ParseTaskWaitContinuationStarted(payloadBytes),
+        var name when name == TraceOperationEnd.Name => TplParser.ParseTraceOperationEnd(payloadBytes),
+        var name when name == TraceOperationBegin.Name => TplParser.ParseTraceOperationBegin(payloadBytes),
+        var name when name == TaskWaitContinuationComplete.Name => TplParser.ParseTaskWaitContinuationComplete(payloadBytes),
+        var name when name == TaskWaitEnd.Name => TplParser.ParseTaskWaitEnd(payloadBytes),
+        var name when name == TaskWaitBegin.Name => TplParser.ParseTaskWaitBegin(payloadBytes),
+        var name when name == AwaitTaskContinuationScheduled.Name => TplParser.ParseAwaitTaskContinuationScheduled(payloadBytes),
+        var name when name == TaskScheduled.Name => TplParser.ParseTaskScheduled(payloadBytes),
+        var name when name == TraceOperationRelation.Name => TplParser.ParseTraceOperationRelation(payloadBytes),
+        var name when name == ProcessInfo.Name => ProcessInfoParser.ParseProcessInfo(payloadBytes),
+        var other => null
+    };
 }
 
 public class NettraceReaderViewModel : ReactiveObject, IViewModel

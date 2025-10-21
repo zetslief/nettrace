@@ -49,7 +49,7 @@ static void PrintEventBlob(
         var name when name == TaskWaitContinuationComplete.Name => TplParser.ParseTaskWaitContinuationComplete(payloadBytes),
         var name when name == TaskWaitEnd.Name => TplParser.ParseTaskWaitEnd(payloadBytes),
         var name when name == TaskWaitBegin.Name => TplParser.ParseTaskWaitBegin(payloadBytes),
-        var name when name == AwaitTaskContinuationScheduled.Name => TplParser.ParseAwaitTaskContinuation(payloadBytes),
+        var name when name == AwaitTaskContinuationScheduled.Name => TplParser.ParseAwaitTaskContinuationScheduled(payloadBytes),
         var name when name == TaskScheduled.Name => TplParser.ParseTaskScheduled(payloadBytes),
         var name when name == TraceOperationRelation.Name => TplParser.ParseTraceOperationRelation(payloadBytes),
         var name when name == ProcessInfo.Name => ProcessInfoParser.ParseProcessInfo(payloadBytes),

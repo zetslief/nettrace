@@ -15,8 +15,7 @@
                     <TextBlock Text="{Binding Blob.MetadataId, StringFormat='Metadata Id: {0}'}"/>
                     <TextBlock Text="{Binding Blob.CaptureThreadId, StringFormat='CaptureThreadId: {0}'}"/>
                     <TextBlock Text="{Binding Timestamp, StringFormat='Timestamp: {0:HH:mm:ss.ffff}'}"/>
-                    <TextBlock Text="{Binding EventId, StringFormat='EventId: {0}'}"/>
-                    <TextBlock Text="{Binding EventName, StringFormat='EventName: {0}'}"/>
+                    <TextBlock Text="{Binding Event, StringFormat='Event: {0}'}"/>
                 </StackPanel>
                 <DockPanel IsVisible="{Binding $parent[ListBoxItem].IsSelected}">
                     <TextBlock Text="{Binding}"

@@ -12,7 +12,7 @@ public static class TplParser
         MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))])
     );
 
-    public static AwaitTaskContinuationScheduled ParseAwaitTaskContinuation(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+    public static AwaitTaskContinuationScheduled ParseAwaitTaskContinuationScheduled(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
         MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))]),
         MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))]),
         MemoryMarshal.Read<int>(bytes[cursor..MoveBy(ref cursor, sizeof(int))])
