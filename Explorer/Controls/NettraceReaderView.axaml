@@ -35,11 +35,17 @@
                 Content="Browse"/>
             <TextBlock Text="{Binding Status}"/>
         </DockPanel>
-        <DockPanel>
-            <TextBlock Text="Event Blobs"
-                DockPanel.Dock="Top"/>
-            <ListBox ItemsSource="{Binding AllEventBlobs}"
-                SelectionMode="Single" />
-        </DockPanel>
+        <TabControl>
+            <TabItem Header="Event Blobs">
+                <Panel>
+                    <ListBox ItemsSource="{Binding AllEventBlobs}" SelectionMode="Single" />
+                </Panel>
+            </TabItem>
+            <TabItem Header="Stacks">
+                <Panel>
+                    <ListBox ItemsSource="{Binding AllStacks}" SelectionMode="Single" />
+                </Panel>
+            </TabItem>
+        </TabControl>
     </DockPanel>
 </UserControl>

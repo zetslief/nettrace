@@ -2,6 +2,8 @@ using System;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Platform.Storage;
@@ -14,7 +16,7 @@ using static Nettrace.NettraceReader;
 
 namespace Explorer.ViewModels;
 
-public class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, EventBlob<MetadataEvent> metadata)
+public sealed class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, EventBlob<MetadataEvent> metadata)
 {
     public EventBlob<Event> Blob => eventBlob;
     public DateTime Timestamp => QpcToUtc(trace, eventBlob.TimeStamp);
@@ -40,6 +42,34 @@ public class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, EventBl
     };
 }
 
+public sealed class StackViewModel(int id, int pointerSize, Stack stack)
+{
+    private readonly int _id = id;
+    private readonly int _pointerSize = pointerSize;
+    private readonly Stack _stack = stack;
+
+    public override string ToString()
+    {
+        StringBuilder builder = new();
+        builder.AppendLine($"Id {_id} - {_stack}");
+        int cursor = 0;
+        var payload = _stack.Payload.AsSpan();
+        while (cursor < payload.Length)
+        {
+            if (_pointerSize == 4)
+            {
+                builder.AppendLine($"\t0x{MemoryMarshal.Read<int>(payload[cursor..(cursor + _pointerSize)]):X}");
+            }
+            else
+            {
+                builder.AppendLine($"\t0x{MemoryMarshal.Read<long>(payload[cursor..(cursor + _pointerSize)]):X}");
+            }
+            cursor += _pointerSize;
+        }
+        return builder.ToString();
+    }
+}
+
 public class NettraceReaderViewModel : ReactiveObject, IViewModel
 {
     private readonly ILogger<NettraceReaderViewModel> _logger;
@@ -50,7 +80,8 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
 
     private Trace? _trace;
 
-    private ImmutableArray<EventBlobViewModel>? _allEventBlobs;
+    private ImmutableArray<EventBlobViewModel> _allEventBlobs = [];
+    private ImmutableArray<StackViewModel> _allStacks = [];
 
     public NettraceReaderViewModel(ILogger<NettraceReaderViewModel> logger, NettraceParser parser, IStorageProvider storageProvider)
     {
@@ -74,10 +105,16 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         set => this.RaiseAndSetIfChanged(ref _filePath, value);
     }
 
-    public ImmutableArray<EventBlobViewModel>? AllEventBlobs
+    public ImmutableArray<EventBlobViewModel> AllEventBlobs
     {
         get => _allEventBlobs;
-        set => this.RaiseAndSetIfChanged(ref _allEventBlobs, value);
+        private set => this.RaiseAndSetIfChanged(ref _allEventBlobs, value);
+    }
+
+    public ImmutableArray<StackViewModel> AllStacks
+    {
+        get => _allStacks;
+        set => this.RaiseAndSetIfChanged(ref _allStacks, value);
     }
 
     public string Status
@@ -139,5 +176,6 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
             .SelectMany(block => block.EventBlobs)
             .Select(blob => new EventBlobViewModel(_trace, blob, metadataCache[blob.MetadataId]))
         ];
+        AllStacks = [.. file.StackBlock.Stacks.Select((s, i) => new StackViewModel(file.StackBlock.FirstId + i - 1, file.Trace.PointerSize, s))];
     }
 }
