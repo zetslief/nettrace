@@ -46,6 +46,11 @@
                     <ListBox ItemsSource="{Binding AllStacks}" SelectionMode="Single" />
                 </Panel>
             </TabItem>
+            <TabItem Header="Sequence Point Block">
+                <Panel>
+                    <TextBlock Text="{Binding SequencePointBlock.Block, FallbackValue=null}" />
+                </Panel>
+            </TabItem>
         </TabControl>
     </DockPanel>
 </UserControl>
