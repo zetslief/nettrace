@@ -31,4 +31,5 @@ TODO:
 > On 32 bit traces the stack bytes can be interpreted as an array of 4 byte integer IPs. On 64 bit traces it is an array of 8 byte integer IPs. Each stack can be given an ID by starting with First Id and incrementing by 1 for each additional stack in the block in stream order.
 
 ^ this is super confusing. Explore if runtime rundown events could help somehow.
+Runtime rundown events are empty. See [Issue](https://github.com/dotnet/runtime/issues/96365).
 This events are described only in `ClrEtwAll.man`.
