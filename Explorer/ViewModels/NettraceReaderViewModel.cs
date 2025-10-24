@@ -19,6 +19,7 @@ namespace Explorer.ViewModels;
 public sealed class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, EventBlob<MetadataEvent> metadata)
 {
     public EventBlob<Event> Blob => eventBlob;
+    public EventBlob<MetadataEvent> MetadataBlob => metadata;
     public DateTime Timestamp => QpcToUtc(trace, eventBlob.TimeStamp);
     public IEvent? Event { get; } = GenericTplParser(metadata.Payload.Header.EventName, eventBlob.Payload.Bytes.Span);
     public override string ToString() => Blob.ToString();
@@ -38,8 +39,13 @@ public sealed class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, 
         var name when name == TaskScheduled.Name => TplParser.ParseTaskScheduled(payloadBytes),
         var name when name == TraceOperationRelation.Name => TplParser.ParseTraceOperationRelation(payloadBytes),
         var name when name == ProcessInfo.Name => ProcessInfoParser.ParseProcessInfo(payloadBytes),
-        var other => null
+        var other => new UnknownEvent(other, Encoding.UTF8.GetString(payloadBytes)),
     };
+
+    private record UnknownEvent(string EventName, string Content) : IEvent
+    {
+        public static string Name => nameof(UnknownEvent);
+    }
 }
 
 public sealed class StackViewModel(int id, int pointerSize, Stack stack)

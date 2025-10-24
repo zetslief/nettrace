@@ -18,7 +18,7 @@ public sealed class NettraceReaderTest
     }
 
     [Fact]
-    public void TestPaylaodLength()
+    public void TestPayloadLength()
     {
         List<int> exp = [];
         UsingEventPipe(onEvent: @event => exp.Add(@event.EventData().Length));
