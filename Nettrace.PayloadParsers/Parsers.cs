@@ -106,6 +106,33 @@ public static class RuntimeRundownEvents
         NettraceReader.ReadUnicode(bytes, ref cursor)
     );
 
+    public static DCEndInit ParseDCEndInit(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<ushort>(bytes)
+    );
+
+    public static MethodDCEndVerbose ParseMethodDCEndVerbose(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        0 // TODO: this is a new field in V2 message. It is missing in V1 message.
+    );
+
+    public static MethodDCEndILToNativeMap ParseMethodDCEndILToNativeMap(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
+        MemoryMarshal.Read<byte>(bytes[cursor..MoveBy(ref cursor, sizeof(byte))]),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))])
+    );
+
     private static int MoveBy(ref int value, int by)
     {
         value += by;
