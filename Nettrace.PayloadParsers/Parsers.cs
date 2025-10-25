@@ -121,16 +121,41 @@ public static class RuntimeRundownEvents
         NettraceReader.ReadUnicode(bytes, ref cursor),
         NettraceReader.ReadUnicode(bytes, ref cursor),
         MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
-        0 // TODO: this is a new field in V2 message. It is missing in V1 message.
+        0 // WARNING: this is a new field in V2 message. It is missing in V1 message.
     );
 
-    public static MethodDCEndILToNativeMap ParseMethodDCEndILToNativeMap(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+    public static MethodDCEndILToNativeMap ParseMethodDCEndILToNativeMap(ReadOnlySpan<byte> bytes, int cursor = 0)
+    {
+        ulong methodId = MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]);
+        ulong reJitId = MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]);
+        byte methodExtent = MemoryMarshal.Read<byte>(bytes[cursor..MoveBy(ref cursor, sizeof(byte))]);
+        ushort countOfMapEntries = MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]);
+        uint[] ilOffsets = new uint[countOfMapEntries];
+        for (int index = 0; index < ilOffsets.Length; ++index)
+            ilOffsets[index] = MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]);
+        uint[] nativeOffsets = new uint[countOfMapEntries];
+        for (int index = 0; index < nativeOffsets.Length; ++index)
+            nativeOffsets[index] = MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]);
+        ushort clrInstanceId = MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]);
+        ulong ilVersionId = MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]);
+        return new(methodId, reJitId, methodExtent, countOfMapEntries, ilOffsets, nativeOffsets, clrInstanceId, ilVersionId);
+    }
+
+    public static ModuleDCEnd ParseModuleDCEnd(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
         MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
         MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
-        MemoryMarshal.Read<byte>(bytes[cursor..MoveBy(ref cursor, sizeof(byte))]),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
         MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
-        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
-        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))])
+        MemoryMarshal.Read<Guid>(bytes[cursor..MoveBy(ref cursor, 16)]),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
+        MemoryMarshal.Read<Guid>(bytes[cursor..MoveBy(ref cursor, 16)]),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
+        string.Empty // WARNING: this is a new field in V3 message. NativeBuildID
     );
 
     private static int MoveBy(ref int value, int by)
