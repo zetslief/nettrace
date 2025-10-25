@@ -1,4 +1,5 @@
 ﻿using System.Collections.Immutable;
+using System.Text;
 using Nettrace;
 using Nettrace.PayloadParsers;
 
@@ -20,7 +21,6 @@ var eventBlobs = file.EventBlocks.SelectMany(b => b.EventBlobs).ToImmutableArray
 foreach (var eventBlob in eventBlobs)
 {
     var metadata = metadataStorage[eventBlob.MetadataId].Payload;
-    if (metadata.Header.EventName.Length == 0) continue;
     Console.Write($"{eventBlob.SequenceNumber} - Thread {eventBlob.ThreadId} - ");
     PrintEventBlob(eventBlob, metadata);
 }
@@ -31,29 +31,31 @@ static void PrintEventBlob(
     NettraceReader.EventBlob<NettraceReader.Event> blob,
     NettraceReader.MetadataEvent metadata)
 {
-    if (metadata.Header.EventName.Length == 0)
-    {
-        Console.WriteLine($"No event name in {metadata}");
-        return;
-    }
-
     ReadOnlySpan<byte> payloadBytes = blob.Payload.Bytes.Span;
-    IEvent @event = metadata.Header.EventName switch
+    IEvent @event = metadata.Header.ProviderName switch
     {
-        var name when name == NewId.Name => TplParser.ParseNewId(payloadBytes),
-        var name when name == TraceSynchronousWorkBegin.Name => TplParser.ParseTraceSynchronousWorkBegin(payloadBytes),
-        var name when name == TraceSynchronousWorkEnd.Name => TplParser.ParseTraceSynchronousWorkEnd(payloadBytes),
-        var name when name == TaskWaitContinuationStarted.Name => TplParser.ParseTaskWaitContinuationStarted(payloadBytes),
-        var name when name == TraceOperationEnd.Name => TplParser.ParseTraceOperationEnd(payloadBytes),
-        var name when name == TraceOperationBegin.Name => TplParser.ParseTraceOperationBegin(payloadBytes),
-        var name when name == TaskWaitContinuationComplete.Name => TplParser.ParseTaskWaitContinuationComplete(payloadBytes),
-        var name when name == TaskWaitEnd.Name => TplParser.ParseTaskWaitEnd(payloadBytes),
-        var name when name == TaskWaitBegin.Name => TplParser.ParseTaskWaitBegin(payloadBytes),
-        var name when name == AwaitTaskContinuationScheduled.Name => TplParser.ParseAwaitTaskContinuationScheduled(payloadBytes),
-        var name when name == TaskScheduled.Name => TplParser.ParseTaskScheduled(payloadBytes),
-        var name when name == TraceOperationRelation.Name => TplParser.ParseTraceOperationRelation(payloadBytes),
-        var name when name == ProcessInfo.Name => ProcessInfoParser.ParseProcessInfo(payloadBytes),
-        var other => throw new NotImplementedException($"Blob parsing is not implemented for \n\t{metadata.Header.EventName} {blob.SequenceNumber} {metadata.Payload}")
+        TplProvider.Name => metadata.Header.EventId switch
+        {
+            26 => TplParser.ParseNewId(payloadBytes),
+            // var name when name == TraceSynchronousWorkBegin.Name => TplParser.ParseTraceSynchronousWorkBegin(payloadBytes),
+            // var name when name == TraceSynchronousWorkEnd.Name => TplParser.ParseTraceSynchronousWorkEnd(payloadBytes),
+            // var name when name == TaskWaitContinuationStarted.Name => TplParser.ParseTaskWaitContinuationStarted(payloadBytes),
+            // var name when name == TraceOperationEnd.Name => TplParser.ParseTraceOperationEnd(payloadBytes),
+            // var name when name == TraceOperationBegin.Name => TplParser.ParseTraceOperationBegin(payloadBytes),
+            // var name when name == TaskWaitContinuationComplete.Name => TplParser.ParseTaskWaitContinuationComplete(payloadBytes),
+            // var name when name == TaskWaitEnd.Name => TplParser.ParseTaskWaitEnd(payloadBytes),
+            // var name when name == TaskWaitBegin.Name => TplParser.ParseTaskWaitBegin(payloadBytes),
+            // var name when name == AwaitTaskContinuationScheduled.Name => TplParser.ParseAwaitTaskContinuationScheduled(payloadBytes),
+            // var name when name == TaskScheduled.Name => TplParser.ParseTaskScheduled(payloadBytes),
+            // var name when name == TraceOperationRelation.Name => TplParser.ParseTraceOperationRelation(payloadBytes),
+            // var name when name == ProcessInfo.Name => ProcessInfoParser.ParseProcessInfo(payloadBytes),
+            var other => throw new NotImplementedException($"{TplProvider.Name} - blob parsing is not implemented for \n\t{metadata.Header} {metadata.Payload}")
+        },
+        RuntimeRundownProvider.Name => metadata.Header.EventId switch
+        {
+            _ => throw new NotImplementedException($"{RuntimeRundownProvider.Name} - blob parsing is not implemented for \n\t{metadata.Header} {metadata.Payload}")
+        },
+        var unknownProvider => throw new NotImplementedException($"Parser for {unknownProvider} is not implemented."),
     };
     Console.WriteLine(@event);
 }

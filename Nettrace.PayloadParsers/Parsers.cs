@@ -85,3 +85,30 @@ public static class ProcessInfoParser
         NettraceReader.ReadUnicode(bytes, ref cursor)
     );
 }
+
+public static class RuntimeRundownEvents
+{
+    public static RuntimeInformationRundown ParseRuntimeInformationRundown(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))]),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        MemoryMarshal.Read<byte>(bytes[cursor..MoveBy(ref cursor, sizeof(byte))]),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
+        MemoryMarshal.Read<Guid>(bytes[cursor..MoveBy(ref cursor, 16)]),
+        NettraceReader.ReadUnicode(bytes, ref cursor)
+    );
+
+    private static int MoveBy(ref int value, int by)
+    {
+        value += by;
+        return value;
+    }
+}

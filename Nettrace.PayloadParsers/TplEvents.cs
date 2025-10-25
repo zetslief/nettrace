@@ -1,5 +1,10 @@
 ﻿namespace Nettrace.PayloadParsers;
 
+public static class TplProvider
+{
+    public const string Name = "System.Threading.Tasks.TplEventSource";
+}
+
 /*
  TaskScheduled 70270 MetadataPayload (6 fields):
    FieldV1 { TypeCode = 9, FieldName = OriginatingTaskSchedulerID }
