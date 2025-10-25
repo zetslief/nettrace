@@ -20,6 +20,9 @@ TODO:
     - [ ] `NettraceReader.ReadUnicode` should be moved out.
     - [ ] `MoveBy` should be moved out and mb even repalced with ranges.
 - Move types outside of the `NettraceReader`. It is annoying to prefix them with `NettraceReader`.
+- Paylod Parsers
+    - Verify input.
+    - Ensure whole payload is read.
 
 ## Stacks
 
