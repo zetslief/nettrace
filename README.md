@@ -11,19 +11,15 @@ Useful links:
 * [.NET Events Viewer](https://github.com/verdie-g/dotnet-events-viewer.git)
 
 TODO:
-- TPL
-    - [x] Parse basic events.
-    - [x] Move parsing logic into a separate project.
-    - [ ] Build tests to trigger specific TPL events.
-    - [ ] `TaskWaitBegin.ContinueWithTaskId` might contain incorrect value.
 - Explorer
-    - [ ] Create simple list of all events.
-    - [ ] Group events by thread id.
-    - [ ] Gropu events by task id.
+    - [ ] Add tabs for every kind of blocks in the files.
 - profileme:
     - [ ] Add mode that allows synchronized start - to capture full trace.
+    - [ ] Ensure it triggers all TPL events.
 - Data parsing logic should be shared between the explrer and the nettrace lib.
     - [ ] `NettraceReader.ReadUnicode` should be moved out.
+    - [ ] `MoveBy` should be moved out and mb even repalced with ranges.
+- Move types outside of the `NettraceReader`. It is annoying to prefix them with `NettraceReader`.
 
 ## Stacks
 
@@ -31,5 +27,13 @@ TODO:
 > On 32 bit traces the stack bytes can be interpreted as an array of 4 byte integer IPs. On 64 bit traces it is an array of 8 byte integer IPs. Each stack can be given an ID by starting with First Id and incrementing by 1 for each additional stack in the block in stream order.
 
 ^ this is super confusing. Explore if runtime rundown events could help somehow.
-Runtime rundown events are empty. See [Issue](https://github.com/dotnet/runtime/issues/96365).
+
+## Runtime Rundown events
+
+> Runtime rundown events have empty names. See [Issue](https://github.com/dotnet/runtime/issues/96365).
+
 This events are described only in `ClrEtwAll.man`.
+
+These events often have multiple versions, which share the same IDs.
+Related metadata header contains version number.
+
