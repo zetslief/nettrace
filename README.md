@@ -13,6 +13,7 @@ Useful links:
 TODO:
 - Explorer
     - [ ] Add tabs for every kind of blocks in the files.
+    - [ ] For events, provide a way to explore them per provider.
 - profileme:
     - [ ] Add mode that allows synchronized start - to capture full trace.
     - [ ] Ensure it triggers all TPL events.
@@ -39,4 +40,7 @@ This events are described only in `ClrEtwAll.man`.
 
 These events often have multiple versions, which share the same IDs.
 Related metadata header contains version number.
+
+Qs:
+- What is `DC`?
 
