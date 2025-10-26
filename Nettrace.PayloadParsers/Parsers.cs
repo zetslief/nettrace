@@ -169,6 +169,23 @@ public static class RuntimeRundownEvents
         string.Empty // WARNING: this is a new field in V3 message. NativeBuildID
     );
 
+    public static AssemblyDCEnd ParseAssemblyDCEnd(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))])
+    );
+
+    public static AppDomainDCEnd ParseAppDomainDCEnd(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))])
+    );
+
     private static int MoveBy(ref int value, int by)
     {
         value += by;

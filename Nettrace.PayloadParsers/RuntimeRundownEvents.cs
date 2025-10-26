@@ -5,7 +5,7 @@ public static class RuntimeRundownProvider
     public const string Name = "Microsoft-Windows-DotNETRuntimeRundown";
 }
 
-// this event also contains 2 older versions.
+// NOTE: this event also contains 2 older versions.
 public sealed record MethodDCEndVerbose(
     ulong MethodID,
     ulong ModuleID,
@@ -24,14 +24,14 @@ public sealed record MethodDCEndVerbose(
     public static string Name => nameof(MethodDCEndVerbose);
 }
 
-// this event also contains older version.
+// NOTE: this event also contains older version.
 public sealed record DCEndInit(uint ClrInstanceID) : IEvent
 {
     public static int Id => 148;
     public static string Name => nameof(DCEndInit);
 }
 
-// this event also contains older versions.
+// NOTE: this event also contains older versions.
 public sealed record MethodDCEndILToNativeMap(
     ulong MethodID,
     ulong ReJITID,
@@ -47,7 +47,7 @@ public sealed record MethodDCEndILToNativeMap(
     public static string Name => nameof(MethodDCEndILToNativeMap);
 }
 
-// this event has 2 versions (0, 1).
+// NOTE: this event has 2 versions (0, 1).
 public sealed record DomainModuleDCEnd(
     ulong ModuleID,
     ulong AssemblyID,
@@ -63,8 +63,7 @@ public sealed record DomainModuleDCEnd(
     public static string Name => nameof(DomainModuleDCEnd);
 }
 
-// ModuleDCEnd
-// this event also contains older versions.
+// NOTE: this event also contains older versions.
 public sealed record ModuleDCEnd(
     ulong ModuleID,
     ulong AssemblyID,
@@ -84,6 +83,33 @@ public sealed record ModuleDCEnd(
 {
     public static int Id => 154;
     public static string Name => nameof(ModuleDCEnd);
+}
+
+// NOTE: 2 versions are available (0, 1).
+public sealed record AssemblyDCEnd(
+    ulong AssemblyID,
+    ulong AppDomainID,
+    ulong BindingID,
+    uint AssemblyFlags,
+    string FullyQualifiedAssemblyName,
+    ushort ClrInstanceID
+) : IEvent
+{
+    public static int Id => 156;
+    public static string Name => nameof(AssemblyDCEnd);
+}
+
+// NOTE: 2 versions are available (0, 1).
+public sealed record AppDomainDCEnd(
+    ulong AppDomainID,
+    uint AppDomainFlags,
+    string AppDomainName,
+    uint AppDomainIndex,
+    ushort ClrInstanceID
+) : IEvent
+{
+    public static int Id => 158;
+    public static string Name => nameof(AppDomainDCEnd);
 }
 
 public sealed record RuntimeInformationRundown(
