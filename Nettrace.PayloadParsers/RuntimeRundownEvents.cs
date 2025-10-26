@@ -5,6 +5,21 @@ public static class RuntimeRundownProvider
     public const string Name = "Microsoft-Windows-DotNETRuntimeRundown";
 }
 
+public sealed record GCSettingsRundown(
+    ulong HardLimit,
+    ulong LOHThreshold,
+    ulong PhysicalMemoryConfig,
+    ulong Gen0MinBudgetConfig,
+    ulong Gen0MaxBudgetConfig,
+    uint HighMemPercentConfig,
+    uint BitSettings,
+    ushort ClrInstanceID
+) : IEvent
+{
+    public static int Id => 10;
+    public static string Name => nameof(GCSettingsRundown);
+}
+
 // NOTE: this event also contains 2 older versions.
 public sealed record MethodDCEndVerbose(
     ulong MethodID,
@@ -22,6 +37,13 @@ public sealed record MethodDCEndVerbose(
 {
     public static int Id => 144;
     public static string Name => nameof(MethodDCEndVerbose);
+}
+
+// NOTE: 0 and 1 verions are available.
+public sealed record DCEndComplete(ushort ClrInstanceID) : IEvent
+{
+    public static int Id => 146;
+    public static string Name => nameof(DCEndComplete);
 }
 
 // NOTE: this event also contains older version.

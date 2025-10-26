@@ -1,4 +1,5 @@
 ﻿using System.Collections.Immutable;
+using System.Runtime;
 using System.Text;
 using Nettrace;
 using Nettrace.PayloadParsers;
@@ -58,7 +59,9 @@ static void PrintEventBlob(
         },
         RuntimeRundownProvider.Name => metadata.Header.EventId switch
         {
+            var id when id == GCSettingsRundown.Id => RuntimeRundownEvents.ParseGCSettingsRundown(payloadBytes),
             var id when id == MethodDCEndVerbose.Id => RuntimeRundownEvents.ParseMethodDCEndVerbose(payloadBytes),
+            var id when id == DCEndComplete.Id => RuntimeRundownEvents.ParseDCEndComplete(payloadBytes),
             var id when id == DCEndInit.Id => RuntimeRundownEvents.ParseDCEndInit(payloadBytes),
             var id when id == MethodDCEndILToNativeMap.Id => RuntimeRundownEvents.ParseMethodDCEndILToNativeMap(payloadBytes),
             var id when id == DomainModuleDCEnd.Id => RuntimeRundownEvents.ParseDomainModuleDCEnd(payloadBytes),
