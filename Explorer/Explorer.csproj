@@ -29,6 +29,6 @@
   <ItemGroup>
     <ProjectReference Include="..\Nettrace\Nettrace.csproj" />
     <ProjectReference Include="..\Ipc\Ipc.csproj" />
-    <ProjectReference Include="..\Nettrace.PayloadParsers\Nettrace.PayloadParsers.csproj" />
+    <ProjectReference Include="..\Nettrace.HighLevel\Nettrace.HighLevel.csproj" />
   </ItemGroup>
 </Project>

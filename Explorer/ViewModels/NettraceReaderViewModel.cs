@@ -9,6 +9,7 @@ using System.Windows.Input;
 using Avalonia.Platform.Storage;
 using Microsoft.Extensions.Logging;
 using Nettrace;
+using Nettrace.HighLevel;
 using Nettrace.PayloadParsers;
 using ReactiveUI;
 using static Nettrace.Helpers;
@@ -21,31 +22,8 @@ public sealed class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, 
     public EventBlob<Event> Blob => eventBlob;
     public EventBlob<MetadataEvent> MetadataBlob => metadata;
     public DateTime Timestamp => QpcToUtc(trace, eventBlob.TimeStamp);
-    public IEvent? Event { get; } = GenericTplParser(metadata.Payload.Header.EventName, eventBlob.Payload.Bytes.Span);
+    public IEvent? Event { get; } = NettraceEventParser.ProcessEvent(metadata.Payload, eventBlob);
     public override string ToString() => Blob.ToString();
-
-    private static IEvent? GenericTplParser(string eventName, ReadOnlySpan<byte> payloadBytes) => eventName switch
-    {
-        var name when name == NewId.Name => TplParser.ParseNewId(payloadBytes),
-        var name when name == TraceSynchronousWorkBegin.Name => TplParser.ParseTraceSynchronousWorkBegin(payloadBytes),
-        var name when name == TraceSynchronousWorkEnd.Name => TplParser.ParseTraceSynchronousWorkEnd(payloadBytes),
-        var name when name == TaskWaitContinuationStarted.Name => TplParser.ParseTaskWaitContinuationStarted(payloadBytes),
-        var name when name == TraceOperationEnd.Name => TplParser.ParseTraceOperationEnd(payloadBytes),
-        var name when name == TraceOperationBegin.Name => TplParser.ParseTraceOperationBegin(payloadBytes),
-        var name when name == TaskWaitContinuationComplete.Name => TplParser.ParseTaskWaitContinuationComplete(payloadBytes),
-        var name when name == TaskWaitEnd.Name => TplParser.ParseTaskWaitEnd(payloadBytes),
-        var name when name == TaskWaitBegin.Name => TplParser.ParseTaskWaitBegin(payloadBytes),
-        var name when name == AwaitTaskContinuationScheduled.Name => TplParser.ParseAwaitTaskContinuationScheduled(payloadBytes),
-        var name when name == TaskScheduled.Name => TplParser.ParseTaskScheduled(payloadBytes),
-        var name when name == TraceOperationRelation.Name => TplParser.ParseTraceOperationRelation(payloadBytes),
-        var name when name == ProcessInfo.Name => ProcessInfoParser.ParseProcessInfo(payloadBytes),
-        var other => new UnknownEvent(other, Encoding.UTF8.GetString(payloadBytes)),
-    };
-
-    private record UnknownEvent(string EventName, string Content) : IEvent
-    {
-        public static string Name => nameof(UnknownEvent);
-    }
 }
 
 public sealed class StackViewModel(int id, int pointerSize, Stack stack)
