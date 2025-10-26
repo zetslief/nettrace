@@ -1,11 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
-  <ItemGroup>
-    <ProjectReference Include="..\Nettrace\Nettrace.csproj" />
-    <ProjectReference Include="..\Ipc\Ipc.csproj" />
-    <ProjectReference Include="..\Nettrace.HighLevel\Nettrace.HighLevel.csproj" />
-  </ItemGroup>
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
@@ -13,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Nettrace\Nettrace.csproj" />
+    <ProjectReference Include="..\Ipc\Ipc.csproj" />
+    <ProjectReference Include="..\Nettrace.HighLevel\Nettrace.HighLevel.csproj" />
+  </ItemGroup>
 </Project>

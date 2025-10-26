@@ -24,12 +24,12 @@ public static class NettraceEventParser
                 var id when id == TaskWaitBegin.Id => TplParser.ParseTaskWaitBegin(payloadBytes),
                 var id when id == TaskScheduled.Id => TplParser.ParseTaskScheduled(payloadBytes),
                 var id when id == TraceOperationRelation.Id => TplParser.ParseTraceOperationRelation(payloadBytes),
-                _ => throw new NotImplementedException($"Blob parsing is not implemented for \n\t{metadata.Header} {metadata.Payload}")
+                _ => new UnknownEvent(metadata),
             },
             EventPipeProvider.Name => metadata.Header.EventId switch
             {
                 var id when id == ProcessInfo.Id => ProcessInfoParser.ParseProcessInfo(payloadBytes),
-                _ => throw new NotImplementedException($"Blob parsing is not implemented for \n\t{metadata.Header} {metadata.Payload}")
+                _ => new UnknownEvent(metadata),
             },
             RuntimeRundownProvider.Name => metadata.Header.EventId switch
             {
@@ -43,9 +43,15 @@ public static class NettraceEventParser
                 var id when id == AssemblyDCEnd.Id => RuntimeRundownEvents.ParseAssemblyDCEnd(payloadBytes),
                 var id when id == AppDomainDCEnd.Id => RuntimeRundownEvents.ParseAppDomainDCEnd(payloadBytes),
                 var id when id == RuntimeInformationRundown.Id => RuntimeRundownEvents.ParseRuntimeInformationRundown(payloadBytes),
-                _ => throw new NotImplementedException($"Blob parsing is not implemented for \n\t{metadata.Header} {metadata.Payload}")
+                _ => new UnknownEvent(metadata),
             },
-            var unknownProvider => throw new NotImplementedException($"Parser for {unknownProvider} is not implemented."),
+            _ => new UnknownEvent(metadata),
         };
     }
+}
+
+public record UnknownEvent(MetadataEvent Metadata) : IEvent
+{
+    public static int Id => -1;
+    public static string Name => nameof(UnknownEvent);
 }

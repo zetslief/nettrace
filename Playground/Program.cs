@@ -1,5 +1,6 @@
 ﻿using System.Collections.Immutable;
 using Nettrace;
+using Nettrace.PayloadParsers;
 using Nettrace.HighLevel;
 
 using var stream = new MemoryStream(File.ReadAllBytes("./traces/tpleventsource_profileme.nettrace"));
@@ -31,5 +32,12 @@ static void PrintEventBlob(
     NettraceReader.MetadataEvent metadata)
 {
     Console.WriteLine(metadata.Header);
-    Console.WriteLine(NettraceEventParser.ProcessEvent(metadata, blob));
+    switch (NettraceEventParser.ProcessEvent(metadata, blob))
+    {
+        case UnknownEvent unknownEvent:
+            break;
+        case { } known:
+            Console.WriteLine(known);
+            break;
+    }
 }
