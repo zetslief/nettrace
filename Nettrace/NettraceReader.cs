@@ -123,7 +123,7 @@ public static class NettraceReader
         Trace Trace,
         Block<MetadataEvent>[] MetadataBlocks,
         Block<Event>[] EventBlocks,
-        StackBlock StackBlock,
+        StackBlock[] StackBlocks,
         SequencePointBlock SequencePointBlock
     );
 
@@ -145,7 +145,7 @@ public static class NettraceReader
 
         Trace? trace = null;
         Type? traceType = null;
-        StackBlock? stack = null;
+        List<StackBlock> stacks = [];
         List<Block<MetadataEvent>> metadataBlocks = [];
         List<Block<Event>> eventBlocks = [];
         SequencePointBlock? sequencePointBlock = null;
@@ -179,7 +179,8 @@ public static class NettraceReader
                         throw new InvalidOperationException($"Failed to read raw block. Cursor: {globalCursor}");
                     var (stackRawBlockLength, stackRawBlock) = maybeStackRawBlock.Value;
                     globalCursor += stackRawBlockLength;
-                    stack = StackBlockDecoder(stackRawBlock);
+                    var stack = StackBlockDecoder(stackRawBlock);
+                    stacks.Add(stack);
                     break;
                 case "EventBlock":
                     Debug.Assert(traceType is not null);
@@ -212,8 +213,8 @@ public static class NettraceReader
             trace ?? throw new InvalidOperationException("File doesn't contain trace."),
             [.. metadataBlocks],
             [.. eventBlocks],
-            stack ?? throw new InvalidOperationException("File doesn't contain stack."),
-            sequencePointBlock ?? throw new InvalidOperationException("File dosn't contain SPB."));
+            [.. stacks],
+            sequencePointBlock ?? throw new InvalidOperationException("File doesn't contain SPB."));
     }
 
     public static bool TryReadStreamHeader(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out (int, string)? result)

@@ -104,13 +104,13 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     public ImmutableArray<StackViewModel> AllStacks
     {
         get => _allStacks;
-        set => this.RaiseAndSetIfChanged(ref _allStacks, value);
+        private set => this.RaiseAndSetIfChanged(ref _allStacks, value);
     }
 
     public SequencePointBlockViewModel? SequencePointBlock
     {
         get => _sequencePointBlock;
-        set => this.RaiseAndSetIfChanged(ref _sequencePointBlock, value);
+        private set => this.RaiseAndSetIfChanged(ref _sequencePointBlock, value);
     }
 
     public string Status
@@ -172,7 +172,10 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
             .SelectMany(block => block.EventBlobs)
             .Select(blob => new EventBlobViewModel(_trace, blob, metadataCache[blob.MetadataId]))
         ];
-        AllStacks = [.. file.StackBlock.Stacks.Select((s, i) => new StackViewModel(file.StackBlock.FirstId + i - 1, file.Trace.PointerSize, s))];
+        AllStacks = [.. file.StackBlocks
+            .Select(sb => sb.Stacks.Select((s, i) => new StackViewModel(sb.FirstId + i - 1, file.Trace.PointerSize, s)))
+            .Aggregate((acc, ss) => acc.Concat(ss))
+        ];
         SequencePointBlock = new(file.SequencePointBlock);
     }
 }
