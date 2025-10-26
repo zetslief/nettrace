@@ -1,7 +1,7 @@
 ﻿using System.Collections.Immutable;
 using Nettrace;
-using Nettrace.PayloadParsers;
 using Nettrace.HighLevel;
+using Nettrace.PayloadParsers;
 
 using var stream = new MemoryStream(File.ReadAllBytes("./traces/tpleventsource_profileme.nettrace"));
 var file = NettraceReader.Read(stream);

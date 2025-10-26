@@ -50,7 +50,7 @@
             </TabItem>
             <TabItem Header="Sequence Point Block">
                 <Panel>
-                    <TextBlock Text="{Binding SequencePointBlock.Block, FallbackValue=null}" />
+                    <ListBox ItemsSource="{Binding AllSequencePointBlocks}" SelectionMode="Single" />
                 </Panel>
             </TabItem>
         </TabControl>

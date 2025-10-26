@@ -124,7 +124,7 @@ public static class NettraceReader
         Block<MetadataEvent>[] MetadataBlocks,
         Block<Event>[] EventBlocks,
         StackBlock[] StackBlocks,
-        SequencePointBlock SequencePointBlock
+        SequencePointBlock[] SequencePointBlocks
     );
 
     public static NettraceFile Read(Stream stream)
@@ -145,10 +145,10 @@ public static class NettraceReader
 
         Trace? trace = null;
         Type? traceType = null;
-        List<StackBlock> stacks = [];
         List<Block<MetadataEvent>> metadataBlocks = [];
         List<Block<Event>> eventBlocks = [];
-        SequencePointBlock? sequencePointBlock = null;
+        List<StackBlock> stacks = [];
+        List<SequencePointBlock> sequencePointBlocks = [];
 
         while (TryStartObject(buffer[globalCursor..], out var maybeType))
         {
@@ -197,7 +197,8 @@ public static class NettraceReader
                         throw new InvalidOperationException($"Failed to read raw block. Cursor: {globalCursor}");
                     var (spRawBlockLength, spRawBlock) = maybeSpRawBlock.Value;
                     globalCursor += spRawBlockLength;
-                    sequencePointBlock = SequencePointBlockDecoder(spRawBlock);
+                    var sequencePointBlock = SequencePointBlockDecoder(spRawBlock);
+                    sequencePointBlocks.Add(sequencePointBlock);
                     break;
                 default:
                     throw new NotImplementedException($"Unknown object type: {type}");
@@ -214,7 +215,7 @@ public static class NettraceReader
             [.. metadataBlocks],
             [.. eventBlocks],
             [.. stacks],
-            sequencePointBlock ?? throw new InvalidOperationException("File doesn't contain SPB."));
+            [.. sequencePointBlocks]);
     }
 
     public static bool TryReadStreamHeader(ReadOnlySpan<byte> buffer, [NotNullWhen(true)] out (int, string)? result)

@@ -57,6 +57,7 @@ public sealed class StackViewModel(int id, int pointerSize, Stack stack)
 public sealed class SequencePointBlockViewModel(SequencePointBlock block)
 {
     public SequencePointBlock Block { get; } = block;
+    public override string ToString() => Block.ToString();
 }
 
 public class NettraceReaderViewModel : ReactiveObject, IViewModel
@@ -71,7 +72,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
 
     private ImmutableArray<EventBlobViewModel> _allEventBlobs = [];
     private ImmutableArray<StackViewModel> _allStacks = [];
-    private SequencePointBlockViewModel? _sequencePointBlock;
+    private ImmutableArray<SequencePointBlockViewModel> _sequencePointBlock = [];
 
     public NettraceReaderViewModel(ILogger<NettraceReaderViewModel> logger, NettraceParser parser, IStorageProvider storageProvider)
     {
@@ -107,7 +108,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         private set => this.RaiseAndSetIfChanged(ref _allStacks, value);
     }
 
-    public SequencePointBlockViewModel? SequencePointBlock
+    public ImmutableArray<SequencePointBlockViewModel> AllSequencePointBlocks
     {
         get => _sequencePointBlock;
         private set => this.RaiseAndSetIfChanged(ref _sequencePointBlock, value);
@@ -173,9 +174,9 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
             .Select(blob => new EventBlobViewModel(_trace, blob, metadataCache[blob.MetadataId]))
         ];
         AllStacks = [.. file.StackBlocks
-            .Select(sb => sb.Stacks.Select((s, i) => new StackViewModel(sb.FirstId + i - 1, file.Trace.PointerSize, s)))
+            .Select(sb => sb.Stacks.Select((s, i) => new StackViewModel(sb.FirstId + i, file.Trace.PointerSize, s)))
             .Aggregate((acc, ss) => acc.Concat(ss))
         ];
-        SequencePointBlock = new(file.SequencePointBlock);
+        AllSequencePointBlocks = [.. file.SequencePointBlocks.Select(spb => new SequencePointBlockViewModel(spb))];
     }
 }
