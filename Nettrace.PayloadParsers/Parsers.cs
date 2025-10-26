@@ -141,6 +141,17 @@ public static class RuntimeRundownEvents
         return new(methodId, reJitId, methodExtent, countOfMapEntries, ilOffsets, nativeOffsets, clrInstanceId, ilVersionId);
     }
 
+    public static DomainModuleDCEnd ParseDomainModuleDCEnd(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
+        MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        MemoryMarshal.Read<uint>(bytes[cursor..MoveBy(ref cursor, sizeof(uint))]),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
+        NettraceReader.ReadUnicode(bytes, ref cursor),
+        MemoryMarshal.Read<ushort>(bytes[cursor..MoveBy(ref cursor, sizeof(ushort))])
+    );
+
     public static ModuleDCEnd ParseModuleDCEnd(ReadOnlySpan<byte> bytes, int cursor = 0) => new(
         MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),
         MemoryMarshal.Read<ulong>(bytes[cursor..MoveBy(ref cursor, sizeof(ulong))]),

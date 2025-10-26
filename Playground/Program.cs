@@ -61,6 +61,7 @@ static void PrintEventBlob(
             var id when id == MethodDCEndVerbose.Id => RuntimeRundownEvents.ParseMethodDCEndVerbose(payloadBytes),
             var id when id == DCEndInit.Id => RuntimeRundownEvents.ParseDCEndInit(payloadBytes),
             var id when id == MethodDCEndILToNativeMap.Id => RuntimeRundownEvents.ParseMethodDCEndILToNativeMap(payloadBytes),
+            var id when id == DomainModuleDCEnd.Id => RuntimeRundownEvents.ParseDomainModuleDCEnd(payloadBytes),
             var id when id == ModuleDCEnd.Id => RuntimeRundownEvents.ParseModuleDCEnd(payloadBytes),
             var id when id == RuntimeInformationRundown.Id => RuntimeRundownEvents.ParseRuntimeInformationRundown(payloadBytes),
             _ => throw new NotImplementedException($"Blob parsing is not implemented for \n\t{metadata.Header} {metadata.Payload}")

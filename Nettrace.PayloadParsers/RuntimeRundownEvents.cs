@@ -47,6 +47,22 @@ public sealed record MethodDCEndILToNativeMap(
     public static string Name => nameof(MethodDCEndILToNativeMap);
 }
 
+// this event has 2 versions (0, 1).
+public sealed record DomainModuleDCEnd(
+    ulong ModuleID,
+    ulong AssemblyID,
+    ulong AppDomainID,
+    uint ModuleFlags,
+    uint Reserved1,
+    string ModuleILPath,
+    string ModuleNativePath,
+    ushort ClrInstanceID
+) : IEvent
+{
+    public static int Id => 152;
+    public static string Name => nameof(DomainModuleDCEnd);
+}
+
 // ModuleDCEnd
 // this event also contains older versions.
 public sealed record ModuleDCEnd(
