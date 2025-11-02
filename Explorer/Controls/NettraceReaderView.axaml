@@ -28,7 +28,7 @@
 
         <DataTemplate DataType="{x:Type vm:SequencePointBlockViewModel}">
             <DockPanel>
-                <StackPanel>
+                <StackPanel DockPanel.Dock="Top">
                     <TextBlock Text="{Binding Block.TimeStamp, StringFormat='Timestamp: {0}'}"/>
                     <TextBlock Text="{Binding Block.ThreadCount, StringFormat='Thread Count: {0}'}" />
                     <TextBlock Text="{Binding Block.BlockSize, StringFormat='Block Size: {0}'}" />
