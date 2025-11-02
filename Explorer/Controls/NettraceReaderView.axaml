@@ -25,6 +25,17 @@
                 </DockPanel>
             </StackPanel>
         </DataTemplate>
+
+        <DataTemplate DataType="{x:Type vm:SequencePointBlockViewModel}">
+            <DockPanel>
+                <StackPanel>
+                    <TextBlock Text="{Binding Block.TimeStamp, StringFormat='Timestamp: {0}'}"/>
+                    <TextBlock Text="{Binding Block.ThreadCount, StringFormat='Thread Count: {0}'}" />
+                    <TextBlock Text="{Binding Block.BlockSize, StringFormat='Block Size: {0}'}" />
+                </StackPanel>
+                <ListBox ItemsSource="{Binding Block.Threads}" />
+            </DockPanel>
+        </DataTemplate>
     </UserControl.DataTemplates>
 
     <DockPanel>
