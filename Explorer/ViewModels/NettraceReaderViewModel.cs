@@ -32,25 +32,20 @@ public sealed class StackViewModel(int id, int pointerSize, Stack stack)
     private readonly int _pointerSize = pointerSize;
     private readonly Stack _stack = stack;
 
-    public override string ToString()
+    public int Id { get; } = id;
+    public int PointerSize { get; } = pointerSize;
+    public ImmutableArray<string> Addresses { get; } = ParseStacks(pointerSize, stack.Payload);
+
+    private static ImmutableArray<string> ParseStacks(int pointerSize, byte[] payload)
     {
-        StringBuilder builder = new();
-        builder.AppendLine($"Id {_id} - {_stack}");
-        int cursor = 0;
-        var payload = _stack.Payload.AsSpan();
-        while (cursor < payload.Length)
+        string[] result = new string[payload.Length / pointerSize];
+        for (int index = 0; index < payload.Length; index += pointerSize)
         {
-            if (_pointerSize == 4)
-            {
-                builder.AppendLine($"\t0x{MemoryMarshal.Read<int>(payload[cursor..(cursor + _pointerSize)]):X}");
-            }
-            else
-            {
-                builder.AppendLine($"\t0x{MemoryMarshal.Read<long>(payload[cursor..(cursor + _pointerSize)]):X}");
-            }
-            cursor += _pointerSize;
+            result[index / pointerSize] = pointerSize == 4
+                ? MemoryMarshal.Read<int>(payload.AsSpan()[index..(index + pointerSize)]).ToString()
+                : MemoryMarshal.Read<long>(payload.AsSpan()[index..(index + pointerSize)]).ToString();
         }
-        return builder.ToString();
+        return [.. result];
     }
 }
 

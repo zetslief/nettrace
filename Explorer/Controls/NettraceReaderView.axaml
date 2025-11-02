@@ -26,6 +26,16 @@
             </StackPanel>
         </DataTemplate>
 
+        <DataTemplate DataType="{x:Type vm:StackViewModel}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top">
+                    <TextBlock Text="{Binding Id, StringFormat='Id: {0}'}"/>
+                    <TextBlock Text="{Binding PointerSize, StringFormat='Pointer Size: {0}'}" />
+                </StackPanel>
+                <ListBox ItemsSource="{Binding Addresses}" />
+            </DockPanel>
+        </DataTemplate>
+
         <DataTemplate DataType="{x:Type vm:SequencePointBlockViewModel}">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Top">
