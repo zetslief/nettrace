@@ -3,9 +3,24 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="clr-namespace:Explorer.ViewModels"
+    xmlns:controls="clr-namespace:Explorer.Controls"
     mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
     x:Class="Explorer.Controls.NettraceReaderView"
     x:DataType="vm:NettraceReaderViewModel">
+
+    <UserControl.Styles>
+    <Style Selector="controls|BoxedItem">
+        <Setter Property="Template">
+            <ControlTemplate>
+                <ContentPresenter
+                    Name="PART_ContentPresenter"
+                    Content="{TemplateBinding Content}"
+                    Margin="1" Padding="1"
+                    BorderBrush="SteelBlue" BorderThickness="1" />
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    </UserControl.Styles>
 
     <UserControl.DataTemplates>
         <DataTemplate DataType="{x:Type vm:EventBlobViewModel}">
@@ -32,7 +47,7 @@
                     <TextBlock Text="{Binding Id, StringFormat='Id: {0}'}"/>
                     <TextBlock Text="{Binding PointerSize, StringFormat='Pointer Size: {0}'}" />
                 </StackPanel>
-                <ListBox ItemsSource="{Binding Addresses}" />
+                <controls:BoxedItemsControl ItemsSource="{Binding Addresses}"/>
             </DockPanel>
         </DataTemplate>
 
@@ -43,7 +58,7 @@
                     <TextBlock Text="{Binding Block.ThreadCount, StringFormat='Thread Count: {0}'}" />
                     <TextBlock Text="{Binding Block.BlockSize, StringFormat='Block Size: {0}'}" />
                 </StackPanel>
-                <ListBox ItemsSource="{Binding Block.Threads}" />
+                <controls:BoxedItemsControl ItemsSource="{Binding Block.Threads}" />
             </DockPanel>
         </DataTemplate>
     </UserControl.DataTemplates>
