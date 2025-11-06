@@ -26,27 +26,10 @@ public sealed class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, 
     public override string ToString() => Blob.ToString();
 }
 
-public sealed class StackViewModel(int id, int pointerSize, Stack stack)
+public sealed class StackViewModel(StackInfo stackInfo)
 {
-    private readonly int _id = id;
-    private readonly int _pointerSize = pointerSize;
-    private readonly Stack _stack = stack;
-
-    public int Id { get; } = id;
-    public int PointerSize { get; } = pointerSize;
-    public ImmutableArray<string> Addresses { get; } = ParseStacks(pointerSize, stack.Payload);
-
-    private static ImmutableArray<string> ParseStacks(int pointerSize, byte[] payload)
-    {
-        string[] result = new string[payload.Length / pointerSize];
-        for (int index = 0; index < payload.Length; index += pointerSize)
-        {
-            result[index / pointerSize] = pointerSize == 4
-                ? MemoryMarshal.Read<int>(payload.AsSpan()[index..(index + pointerSize)]).ToString()
-                : MemoryMarshal.Read<long>(payload.AsSpan()[index..(index + pointerSize)]).ToString();
-        }
-        return [.. result];
-    }
+    public int Id { get; } = stackInfo.Id;
+    public ImmutableArray<long> Addresses { get; } = stackInfo.Addresses;
 }
 
 public sealed class SequencePointBlockViewModel(SequencePointBlock block)
@@ -169,7 +152,8 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
             .Select(blob => new EventBlobViewModel(_trace, blob, metadataCache[blob.MetadataId]))
         ];
         AllStacks = [.. file.StackBlocks
-            .Select(sb => sb.Stacks.Select((s, i) => new StackViewModel(sb.FirstId + i, file.Trace.PointerSize, s)))
+            .Select(sb => sb.Stacks
+                .Select((s, i) => new StackViewModel(StackHelpers.BuildStackInfo(sb.FirstId + i, file.Trace.PointerSize, s))))
             .Aggregate((acc, ss) => acc.Concat(ss))
         ];
         AllSequencePointBlocks = [.. file.SequencePointBlocks.Select(spb => new SequencePointBlockViewModel(spb))];

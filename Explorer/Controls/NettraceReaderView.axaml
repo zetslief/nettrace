@@ -40,18 +40,14 @@
                     <TextBlock Text="{Binding Event, StringFormat='Event: {0}'}"/>
                 </StackPanel>
                 <DockPanel IsVisible="{Binding $parent[ListBoxItem].IsSelected}">
-                    <TextBlock Text="{Binding}"
-                        TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap"/>
                 </DockPanel>
             </StackPanel>
         </DataTemplate>
 
         <DataTemplate DataType="{x:Type vm:StackViewModel}">
             <DockPanel>
-                <StackPanel DockPanel.Dock="Top">
-                    <TextBlock Text="{Binding Id, StringFormat='Id: {0}'}"/>
-                    <TextBlock Text="{Binding PointerSize, StringFormat='Pointer Size: {0}'}" />
-                </StackPanel>
+                <TextBlock DockPanel.Dock="Top" Text="{Binding Id, StringFormat='Id: {0}'}"/>
                 <controls:BoxedItemsControl ItemsSource="{Binding Addresses}"/>
             </DockPanel>
         </DataTemplate>

@@ -1,0 +1,23 @@
+using System.Collections.Immutable;
+using System.Runtime.InteropServices;
+
+using static Nettrace.NettraceReader;
+
+namespace Nettrace.HighLevel;
+
+public record StackInfo(int Id, ImmutableArray<long> Addresses);
+
+public static class StackHelpers
+{
+    public static StackInfo BuildStackInfo(int stackId, int pointerSize, Stack stack)
+    {
+        List<long> addresses = new(stack.Payload.Length);
+        for (int index = 0; index < stack.Payload.Length; index += pointerSize)
+        {
+            addresses.Add(pointerSize == 4
+                ? MemoryMarshal.Read<int>(stack.Payload.AsSpan()[index..(index + pointerSize)])
+                : MemoryMarshal.Read<long>(stack.Payload.AsSpan()[index..(index + pointerSize)]));
+        }
+        return new(stackId, [.. addresses]);
+    }
+}
