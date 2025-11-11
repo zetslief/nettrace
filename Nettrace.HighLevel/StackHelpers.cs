@@ -20,4 +20,7 @@ public static class StackHelpers
         }
         return new(stackId, [.. addresses]);
     }
+
+    public static IEnumerable<StackInfo> BuildStackInfos(this StackBlock block, int pointerSize)
+        => block.Stacks.Select((s, i) => BuildStackInfo(block.FirstId + i, pointerSize, s));
 }

@@ -48,7 +48,13 @@
         <DataTemplate DataType="{x:Type vm:StackViewModel}">
             <DockPanel>
                 <TextBlock DockPanel.Dock="Top" Text="{Binding Id, StringFormat='Id: {0}'}"/>
-                <controls:BoxedItemsControl ItemsSource="{Binding Addresses}"/>
+                <controls:BoxedItemsControl ItemsSource="{Binding Addresses}">
+                    <controls:BoxedItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding ., StringFormat='{}{0:X}'}"></TextBlock>
+                        </DataTemplate>
+                    </controls:BoxedItemsControl.ItemTemplate>
+                </controls:BoxedItemsControl>
             </DockPanel>
         </DataTemplate>
 

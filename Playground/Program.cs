@@ -17,27 +17,49 @@ foreach (var metadataBlock in file.MetadataBlocks)
 }
 
 var eventBlobs = file.EventBlocks.SelectMany(b => b.EventBlobs).ToImmutableArray();
+var stacks = file.StackBlocks.Select(s => s.BuildStackInfos(file.Trace.PointerSize)).ToImmutableArray();
+
+foreach (var stack in stacks)
+{
+    foreach (var item in stack)
+    {
+        Console.WriteLine($"Stack {item}");
+        foreach (var address in item.Addresses)
+        {
+            Console.WriteLine($"\t{address}");
+        }
+    }
+}
 
 foreach (var eventBlob in eventBlobs)
 {
-    var metadata = metadataStorage[eventBlob.MetadataId].Payload;
-    Console.Write($"{eventBlob.SequenceNumber} - Thread {eventBlob.ThreadId} - ");
-    PrintEventBlob(eventBlob, metadata);
-}
-
-return;
-
-static void PrintEventBlob(
-    NettraceReader.EventBlob<NettraceReader.Event> blob,
-    NettraceReader.MetadataEvent metadata)
-{
-    Console.WriteLine(metadata.Header);
-    switch (NettraceEventParser.ProcessEvent(metadata, blob))
+    switch (NettraceEventParser.ProcessEvent(metadataStorage[eventBlob.MetadataId].Payload, eventBlob))
     {
         case UnknownEvent unknownEvent:
             break;
-        case { } known:
-            Console.WriteLine(known);
+        case MethodDCEndVerbose method:
+            Console.WriteLine($"Method: {method}");
+            var address = method.MethodStartAddress;
+            foreach (var stack in stacks)
+            {
+                bool found = false;
+                foreach (var item in stack)
+                {
+                    if (item.Addresses.Contains((long)address))
+                    {
+                        found = true;
+                        Console.WriteLine($"{stack} contains address for method");
+                    }
+                }
+                if (!found)
+                {
+                    Console.WriteLine(method.MethodStartAddress - method.MethodToken);
+                    Console.WriteLine(method.MethodStartAddress + method.MethodToken);
+                    // throw new InvalidOperationException($"Failed to find stack for method: {method}");
+                }
+            }
             break;
     }
 }
+
+return;
