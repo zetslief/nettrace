@@ -59,6 +59,9 @@ foreach (var eventBlob in eventBlobs)
                 }
             }
             break;
+        case var other:
+            Console.WriteLine(other);
+            break;
     }
 }
 

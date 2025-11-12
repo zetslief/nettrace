@@ -82,9 +82,13 @@
         </DockPanel>
         <TabControl>
             <TabItem Header="Event Blobs">
-                <Panel>
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Right">
+                        <Label DockPanel.Dock="Top">Event Types</Label>
+                        <ListBox ItemsSource="{Binding EventTypes}" SelectedItems="{Binding SelectedEventTypes}" SelectionMode="Multiple" />
+                    </DockPanel>
                     <ListBox ItemsSource="{Binding AllEventBlobs}" SelectionMode="Single" />
-                </Panel>
+                </DockPanel>
             </TabItem>
             <TabItem Header="Stacks">
                 <Panel>

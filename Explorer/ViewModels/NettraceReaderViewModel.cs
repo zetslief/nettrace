@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
@@ -20,7 +21,7 @@ public sealed class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, 
     public EventBlob<Event> Blob => eventBlob;
     public EventBlob<MetadataEvent> MetadataBlob => metadata;
     public DateTime Timestamp => QpcToUtc(trace, eventBlob.TimeStamp);
-    public IEvent? Event { get; } = NettraceEventParser.ProcessEvent(metadata.Payload, eventBlob);
+    public IEvent Event { get; } = NettraceEventParser.ProcessEvent(metadata.Payload, eventBlob);
     public override string ToString() => Blob.ToString();
 }
 
@@ -76,6 +77,24 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     {
         get => _allEventBlobs;
         private set => this.RaiseAndSetIfChanged(ref _allEventBlobs, value);
+    }
+
+    private ImmutableArray<System.Type> _eventTypes = [];
+    public ImmutableArray<System.Type> EventTypes
+    {
+        get => _eventTypes;
+        private set => this.RaiseAndSetIfChanged(ref _eventTypes, value);
+    }
+
+    private List<System.Type> _selectedEventTypes = [];
+    public List<System.Type> SelectedEventTypes
+    {
+        get => _selectedEventTypes;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref _selectedEventTypes, value);
+            _logger.LogInformation(value.ToString());
+        }
     }
 
     public ImmutableArray<StackViewModel> AllStacks
@@ -149,6 +168,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
             .SelectMany(block => block.EventBlobs)
             .Select(blob => new EventBlobViewModel(_trace, blob, metadataCache[blob.MetadataId]))
         ];
+        EventTypes = [.. AllEventBlobs.Select(e => e.Event.GetType()).Distinct()];
         AllStacks = [.. file.StackBlocks
             .Select(sb => sb.Stacks
                 .Select((s, i) => new StackViewModel(StackHelpers.BuildStackInfo(sb.FirstId + i, file.Trace.PointerSize, s))))
