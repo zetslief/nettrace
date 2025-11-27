@@ -1,4 +1,5 @@
 using System;
+using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -6,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Platform.Storage;
+using DynamicData.Binding;
 using Microsoft.Extensions.Logging;
 using Nettrace;
 using Nettrace.HighLevel;
@@ -48,6 +50,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     private Trace? _trace;
 
     private ImmutableArray<EventBlobViewModel> _allEventBlobs = [];
+    private IEnumerable<EventBlobViewModel> _filteredEventBlobs = [];
     private ImmutableArray<StackViewModel> _allStacks = [];
     private ImmutableArray<SequencePointBlockViewModel> _sequencePointBlock = [];
 
@@ -62,6 +65,8 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         _parser.OnFileChanged += (s, e)
             => ReadFile(parser.GetFile() ?? throw new InvalidOperationException($"Failed to get nettrace file."));
         _logger.LogInformation("{ViewModelType}  is created.", typeof(NettraceRecorderViewModel));
+        SelectedEventTypes.ToObservableChangeSet()
+            .Subscribe(_ => FilteredEventBlobs = FilterEventBlobs(_allEventBlobs, SelectedEventTypes));
     }
 
     public ICommand ReadFileCommand { get; }
@@ -73,10 +78,10 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         set => this.RaiseAndSetIfChanged(ref _filePath, value);
     }
 
-    public ImmutableArray<EventBlobViewModel> AllEventBlobs
+    public IEnumerable<EventBlobViewModel> FilteredEventBlobs
     {
-        get => _allEventBlobs;
-        private set => this.RaiseAndSetIfChanged(ref _allEventBlobs, value);
+        get => _filteredEventBlobs;
+        private set => this.RaiseAndSetIfChanged(ref _filteredEventBlobs, value);
     }
 
     private ImmutableArray<System.Type> _eventTypes = [];
@@ -86,16 +91,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         private set => this.RaiseAndSetIfChanged(ref _eventTypes, value);
     }
 
-    private List<System.Type> _selectedEventTypes = [];
-    public List<System.Type> SelectedEventTypes
-    {
-        get => _selectedEventTypes;
-        set
-        {
-            this.RaiseAndSetIfChanged(ref _selectedEventTypes, value);
-            _logger.LogInformation(value.ToString());
-        }
-    }
+    public ObservableCollection<System.Type> SelectedEventTypes { get; } = [];
 
     public ImmutableArray<StackViewModel> AllStacks
     {
@@ -164,11 +160,12 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
                 metadataIsIncomplete = true;
             }
         }
-        AllEventBlobs = metadataIsIncomplete ? [] : [.. file.EventBlocks
+        _allEventBlobs = metadataIsIncomplete ? [] : [.. file.EventBlocks
             .SelectMany(block => block.EventBlobs)
             .Select(blob => new EventBlobViewModel(_trace, blob, metadataCache[blob.MetadataId]))
         ];
-        EventTypes = [.. AllEventBlobs.Select(e => e.Event.GetType()).Distinct()];
+        SelectedEventTypes.Clear();
+        EventTypes = [.. _allEventBlobs.Select(e => e.Event.GetType()).Distinct()];
         AllStacks = [.. file.StackBlocks
             .Select(sb => sb.Stacks
                 .Select((s, i) => new StackViewModel(StackHelpers.BuildStackInfo(sb.FirstId + i, file.Trace.PointerSize, s))))
@@ -176,4 +173,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         ];
         AllSequencePointBlocks = [.. file.SequencePointBlocks.Select(spb => new SequencePointBlockViewModel(spb))];
     }
+
+    private static IEnumerable<EventBlobViewModel> FilterEventBlobs(ImmutableArray<EventBlobViewModel> eventBlobs, IReadOnlyList<System.Type> eventTypes)
+        => [.. eventTypes.Count == 0 ? eventBlobs : eventBlobs.Where(b => eventTypes.Contains(b.Event.GetType()))];
 }

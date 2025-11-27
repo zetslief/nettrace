@@ -87,7 +87,7 @@
                         <Label DockPanel.Dock="Top">Event Types</Label>
                         <ListBox ItemsSource="{Binding EventTypes}" SelectedItems="{Binding SelectedEventTypes}" SelectionMode="Multiple" />
                     </DockPanel>
-                    <ListBox ItemsSource="{Binding AllEventBlobs}" SelectionMode="Single" />
+                    <ListBox ItemsSource="{Binding FilteredEventBlobs}" SelectionMode="Multiple" />
                 </DockPanel>
             </TabItem>
             <TabItem Header="Stacks">
