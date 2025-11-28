@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Avalonia.Platform.Storage;
@@ -23,8 +24,46 @@ public sealed class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, 
     public EventBlob<Event> Blob => eventBlob;
     public EventBlob<MetadataEvent> MetadataBlob => metadata;
     public DateTime Timestamp => QpcToUtc(trace, eventBlob.TimeStamp);
-    public IEvent Event { get; } = NettraceEventParser.ProcessEvent(metadata.Payload, eventBlob);
+    public IEventViewModel Event => field ??= MapToViewModel(RawEvent);
+    public IEvent RawEvent { get; } = NettraceEventParser.ProcessEvent(metadata.Payload, eventBlob);
     public override string ToString() => Blob.ToString();
+
+    private static IEventViewModel MapToViewModel(IEvent @event) => @event switch
+    {
+        MethodDCEndILToNativeMap map => new MethodDCEndILToNativeMapViewModel(map),
+        var other => new DefaultEventViewModel(other),
+    };
+
+    public interface IEventViewModel { }
+
+    public class DefaultEventViewModel(IEvent @event) : IEventViewModel
+    {
+        private readonly IEvent _event = @event;
+
+        public override string ToString() => $"{_event}";
+    }
+
+    public class MethodDCEndILToNativeMapViewModel(MethodDCEndILToNativeMap @event) : IEventViewModel
+    {
+        private readonly MethodDCEndILToNativeMap _event = @event;
+
+        public override string ToString()
+        {
+            var stringBuilder = new StringBuilder();
+            stringBuilder.Append($"Method ID: {_event.MethodID}");
+            stringBuilder.Append($" ReJIT ID: {_event.ReJITID} ");
+            stringBuilder.AppendLine($" Byte extent: {_event.MethodExtent:b8}");
+            stringBuilder.Append($"CLR instance ID: {_event.ClrInstanceID}");
+            stringBuilder.AppendLine($" IL Version ID: {_event.ILVersionID}");
+            stringBuilder.AppendLine($"Map entries: {_event.CountOfMapEntries}");
+            for (int index = 0; index < _event.CountOfMapEntries; ++index)
+            {
+                var (ilOffset, nativeOffset) = (_event.ILOffsets[index], _event.NativeOffsets[index]);
+                stringBuilder.AppendLine($"\tILOffset {ilOffset} NativeOffset {nativeOffset}");
+            }
+            return stringBuilder.ToString();
+        }
+    }
 }
 
 public sealed class StackViewModel(StackInfo stackInfo)
@@ -165,7 +204,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
             .Select(blob => new EventBlobViewModel(_trace, blob, metadataCache[blob.MetadataId]))
         ];
         SelectedEventTypes.Clear();
-        EventTypes = [.. _allEventBlobs.Select(e => e.Event.GetType()).Distinct()];
+        EventTypes = [.. _allEventBlobs.Select(e => e.RawEvent.GetType()).Distinct()];
         AllStacks = [.. file.StackBlocks
             .Select(sb => sb.Stacks
                 .Select((s, i) => new StackViewModel(StackHelpers.BuildStackInfo(sb.FirstId + i, file.Trace.PointerSize, s))))
@@ -175,5 +214,5 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     }
 
     private static IEnumerable<EventBlobViewModel> FilterEventBlobs(ImmutableArray<EventBlobViewModel> eventBlobs, IReadOnlyList<System.Type> eventTypes)
-        => [.. eventTypes.Count == 0 ? eventBlobs : eventBlobs.Where(b => eventTypes.Contains(b.Event.GetType()))];
+        => [.. eventTypes.Count == 0 ? eventBlobs : eventBlobs.Where(b => eventTypes.Contains(b.RawEvent.GetType()))];
 }

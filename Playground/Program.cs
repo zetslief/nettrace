@@ -39,6 +39,7 @@ foreach (var eventBlob in eventBlobs)
             break;
         case MethodDCEndVerbose method:
             Console.WriteLine($"Method: {method}");
+            Console.WriteLine(eventBlob);
             var address = method.MethodStartAddress;
             foreach (var stack in stacks)
             {
