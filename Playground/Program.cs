@@ -19,28 +19,16 @@ foreach (var metadataBlock in file.MetadataBlocks)
 var eventBlobs = file.EventBlocks.SelectMany(b => b.EventBlobs).ToImmutableArray();
 var stacks = file.StackBlocks.Select(s => s.BuildStackInfos(file.Trace.PointerSize)).ToImmutableArray();
 
-foreach (var stack in stacks)
-{
-    foreach (var item in stack)
-    {
-        Console.WriteLine($"Stack {item}");
-        foreach (var address in item.Addresses)
-        {
-            Console.WriteLine($"\t{address}");
-        }
-    }
-}
-
 foreach (var eventBlob in eventBlobs)
 {
+    Console.WriteLine(eventBlob);
     switch (NettraceEventParser.ProcessEvent(metadataStorage[eventBlob.MetadataId].Payload, eventBlob))
     {
         case UnknownEvent unknownEvent:
             break;
         case MethodDCEndVerbose method:
             Console.WriteLine($"Method: {method}");
-            Console.WriteLine(eventBlob);
-            var address = method.MethodStartAddress;
+            var address = method.MethodID;
             foreach (var stack in stacks)
             {
                 bool found = false;
@@ -63,6 +51,18 @@ foreach (var eventBlob in eventBlobs)
         case var other:
             Console.WriteLine(other);
             break;
+    }
+}
+
+foreach (var stack in stacks)
+{
+    foreach (var item in stack)
+    {
+        Console.WriteLine($"Stack {item}");
+        foreach (var address in item.Addresses)
+        {
+            Console.WriteLine($"\t{address}");
+        }
     }
 }
 
