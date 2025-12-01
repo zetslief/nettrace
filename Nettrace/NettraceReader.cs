@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Text;
+using static Nettrace.Readers;
 
 namespace Nettrace;
 
@@ -416,7 +417,6 @@ public static class NettraceReader
                 timeStamp, activityId, relatedActivityId, isSorted, payloadSize);
 
             ReadOnlySpan<byte> payload = blockBytes[cursor..MoveBy(ref cursor, payloadSize)];
-
             eventBlobs.Add(EventBlob<T>.Create(flag, payloadDecoder(in payload), in context));
         }
 
@@ -564,40 +564,6 @@ public static class NettraceReader
 
     private static long ReadInt64(ReadOnlySpan<byte> data)
         => MemoryMarshal.Read<long>(data);
-
-    private static int ReadVarInt32(ReadOnlySpan<byte> bytes, ref int cursor)
-    {
-        int result = 0;
-        var maxIndex = 5;
-        for (int byteIndex = 0; byteIndex < maxIndex; ++byteIndex)
-        {
-            int @byte = bytes[cursor++];
-            bool @break = (@byte & 1 << 7) == 0;
-            @byte &= (1 << 7) - 1;
-            @byte <<= 7 * byteIndex;
-            result |= @byte;
-            if (@break)
-                break;
-        }
-        return result;
-    }
-
-    private static long ReadVarInt64(ReadOnlySpan<byte> bytes, ref int cursor)
-    {
-        long result = 0;
-        var maxIndex = 10;
-        for (int byteIndex = 0; byteIndex < maxIndex; ++byteIndex)
-        {
-            long @byte = bytes[cursor++];
-            bool @break = (@byte & 1 << 7) == 0;
-            @byte &= (1 << 7) - 1;
-            @byte <<= 7 * byteIndex;
-            result |= @byte;
-            if (@break)
-                break;
-        }
-        return result;
-    }
 
     private static Guid ReadGuid(ReadOnlySpan<byte> bytes, ref int cursor)
         => MemoryMarshal.Read<Guid>(bytes[cursor..MoveBy(ref cursor, 16)]);
