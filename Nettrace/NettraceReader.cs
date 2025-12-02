@@ -387,6 +387,8 @@ public static class NettraceReader
         var eventBlobs = new List<EventBlob<T>>(100);
         while (cursor < blockBytes.Length)
         {
+            if (blockBytes.Length == 597)
+                Console.WriteLine("hello");
             var flag = blockBytes[cursor++];
             var firstBitIsSet = (flag & 1) != 0;
             var secondBitIsSet = (flag & 2) != 0;
@@ -397,20 +399,20 @@ public static class NettraceReader
             var seventhBitIsSet = (flag & 64) != 0;
             var eighthBitIsSet = (flag & 128) != 0;
 
-            int metadataId = firstBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.MetadataId;
+            int metadataId = firstBitIsSet ? ReadVarUInt32(blockBytes, ref cursor) : context.MetadataId;
             int sequenceNumber = secondBitIsSet
-                ? ReadVarInt32(blockBytes, ref cursor) + context.SequenceNumber
+                ? ReadVarUInt32(blockBytes, ref cursor) + context.SequenceNumber
                 : context.SequenceNumber;
             sequenceNumber = metadataId == 0 ? sequenceNumber : sequenceNumber + 1;
-            long captureThreadId = secondBitIsSet ? ReadVarInt64(blockBytes, ref cursor) : context.ThreadId;
-            int processorNumber = secondBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.ProcessorNumber;
-            long threadId = thirdBitIsSet ? ReadVarInt64(blockBytes, ref cursor) : context.ThreadId;
-            int stackId = forthBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.StackId;
-            long timeStamp = ReadVarInt64(blockBytes, ref cursor) + context.TimeStamp;
+            long captureThreadId = secondBitIsSet ? ReadVarUInt64(blockBytes, ref cursor) : context.ThreadId;
+            int processorNumber = secondBitIsSet ? ReadVarUInt32(blockBytes, ref cursor) : context.ProcessorNumber;
+            long threadId = thirdBitIsSet ? ReadVarUInt64(blockBytes, ref cursor) : context.ThreadId;
+            int stackId = forthBitIsSet ? ReadVarUInt32(blockBytes, ref cursor) : context.StackId;
+            long timeStamp = ReadVarUInt64(blockBytes, ref cursor) + context.TimeStamp;
             Guid activityId = fifthBitIsSet ? ReadGuid(blockBytes, ref cursor) : context.ActivityId;
             Guid relatedActivityId = sixthBitIsSet ? ReadGuid(blockBytes, ref cursor) : context.RelatedActivityId;
             bool isSorted = seventhBitIsSet;
-            int payloadSize = eighthBitIsSet ? ReadVarInt32(blockBytes, ref cursor) : context.PayloadSize;
+            int payloadSize = eighthBitIsSet ? ReadVarUInt32(blockBytes, ref cursor) : context.PayloadSize;
 
             context = new(
                 metadataId, sequenceNumber, captureThreadId, processorNumber, threadId, stackId,

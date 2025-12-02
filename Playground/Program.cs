@@ -3,7 +3,7 @@ using Nettrace;
 using Nettrace.HighLevel;
 using Nettrace.PayloadParsers;
 
-using var stream = new MemoryStream(File.ReadAllBytes("./traces/tpleventsource_profileme.nettrace"));
+using var stream = new MemoryStream(File.ReadAllBytes("/home/cube/progs/nettrace/traces/tpleventsource_profileme.nettrace"));
 var file = NettraceReader.Read(stream);
 
 Dictionary<int, NettraceReader.EventBlob<NettraceReader.MetadataEvent>> metadataStorage = [];
@@ -42,8 +42,6 @@ foreach (var eventBlob in eventBlobs)
                 }
                 if (!found)
                 {
-                    Console.WriteLine(method.MethodStartAddress - method.MethodToken);
-                    Console.WriteLine(method.MethodStartAddress + method.MethodToken);
                     // throw new InvalidOperationException($"Failed to find stack for method: {method}");
                 }
             }
@@ -61,7 +59,7 @@ foreach (var stack in stacks)
         Console.WriteLine($"Stack {item}");
         foreach (var address in item.Addresses)
         {
-            Console.WriteLine($"\t{address}");
+            Console.WriteLine($"\t address {address}");
         }
     }
 }
