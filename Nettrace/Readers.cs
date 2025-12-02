@@ -1,39 +1,48 @@
+using System.Diagnostics;
+
 namespace Nettrace;
 
 public static class Readers
 {
+    private const byte low_mask = 0x7f;
+    private const byte high_mask = 1 << 7;
+    private const byte second_high_mask = 1 << 6;
+
     public static int ReadVarInt32(ReadOnlySpan<byte> bytes, ref int cursor)
     {
-        int result = 0;
-        var maxIndex = 5;
-        for (int byteIndex = 0; byteIndex < maxIndex; ++byteIndex)
+        uint result = 0;
+        var size = sizeof(int) * 8;
+        var shift = 0;
+        byte @byte = high_mask;
+        while ((@byte & high_mask) == high_mask)
         {
-            int @byte = bytes[cursor++];
-            bool @break = (@byte & 1 << 7) == 0;
-            @byte &= (1 << 7) - 1;
-            @byte <<= 7 * byteIndex;
-            result |= @byte;
-            if (@break)
-                break;
+            @byte = bytes[cursor++];
+            result |= (uint)(@byte & low_mask) << shift;
+            shift += 7;
+        }
+        if ((shift < size) && ((@byte & second_high_mask) == second_high_mask))
+        {
+            result |= (uint)-(1 << shift);
         }
         return (int)result;
     }
 
     public static long ReadVarInt64(ReadOnlySpan<byte> bytes, ref int cursor)
     {
-        long result = 0;
-        var maxIndex = 10;
-        for (int byteIndex = 0; byteIndex < maxIndex; ++byteIndex)
+        ulong result = 0;
+        var size = sizeof(long) * 8;
+        var shift = 0;
+        byte @byte = high_mask;
+        while ((@byte & high_mask) == high_mask)
         {
-            long @byte = bytes[cursor++];
-            bool @break = (@byte & 1 << 7) == 0;
-            @byte &= (1 << 7) - 1;
-            @byte <<= 7 * byteIndex;
-            result |= @byte;
-            if (@break)
-                break;
+            @byte = bytes[cursor++];
+            result |= (ulong)(@byte & low_mask) << shift;
+            shift += 7;
         }
-        return result;
+        if ((shift < size) && ((@byte & second_high_mask) == second_high_mask))
+        {
+            result |= (ulong)(long)-(1 << shift);
+        }
+        return (long)result;
     }
-
 }
