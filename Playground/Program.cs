@@ -1,4 +1,6 @@
 ﻿using System.Collections.Immutable;
+using System.Collections.Generic;
+using System.Linq;
 using Nettrace;
 using Nettrace.HighLevel;
 using Nettrace.PayloadParsers;
@@ -16,52 +18,61 @@ foreach (var metadataBlock in file.MetadataBlocks)
     }
 }
 
-var eventBlobs = file.EventBlocks.SelectMany(b => b.EventBlobs).ToImmutableArray();
-var stacks = file.StackBlocks.Select(s => s.BuildStackInfos(file.Trace.PointerSize)).ToImmutableArray();
+var events = file.EventBlocks
+    .SelectMany(b => b.EventBlobs)
+    .Select(b => (object)NettraceEventParser.ProcessEvent(metadataStorage[b.MetadataId].Payload, b))
+    .ToImmutableArray();
+var stacks = file.StackBlocks.Select(s => s.BuildStackInfos(file.Trace.PointerSize))
+    .SelectMany(s => s)
+    .ToImmutableArray();
 
-foreach (var eventBlob in eventBlobs)
-{
-    Console.WriteLine(eventBlob);
-    switch (NettraceEventParser.ProcessEvent(metadataStorage[eventBlob.MetadataId].Payload, eventBlob))
-    {
-        case UnknownEvent unknownEvent:
-            break;
-        case MethodDCEndVerbose method:
-            Console.WriteLine($"Method: {method}");
-            var address = method.MethodID;
-            foreach (var stack in stacks)
-            {
-                bool found = false;
-                foreach (var item in stack)
-                {
-                    if (item.Addresses.Contains((long)address))
-                    {
-                        found = true;
-                        Console.WriteLine($"{stack} contains address for method");
-                    }
-                }
-                if (!found)
-                {
-                    // throw new InvalidOperationException($"Failed to find stack for method: {method}");
-                }
-            }
-            break;
-        case var other:
-            Console.WriteLine(other);
-            break;
-    }
-}
-
+Dictionary<ulong, MethodDCEndVerbose> addressMethodMap = [];
+var methods = events
+    .Where(e => e is MethodDCEndVerbose)
+    .Cast<MethodDCEndVerbose>()
+    .OrderBy(m => m.MethodStartAddress)
+    .ToImmutableArray();
 foreach (var stack in stacks)
 {
-    foreach (var item in stack)
+    BuildAddressMethodMap(stack, methods, addressMethodMap);
+    DumpStack(stack, addressMethodMap);
+}
+
+static void BuildAddressMethodMap(
+    StackInfo stack,
+    ImmutableArray<MethodDCEndVerbose> methods,
+    Dictionary<ulong, MethodDCEndVerbose> storage)
+{
+    foreach (var address in stack.Addresses)
     {
-        Console.WriteLine($"Stack {item}");
-        foreach (var address in item.Addresses)
+        foreach (var method in methods)
         {
-            Console.WriteLine($"\t address {address}");
+            var start = method.MethodStartAddress;
+            var end = start + method.MethodSize;
+            if (address >= start && address <= end)
+            {
+                if (!storage.TryGetValue(address, out var existingMethod))
+                {
+                    storage.Add(address, method);
+                }
+                else
+                {
+                    if (existingMethod != method)
+                        throw new InvalidOperationException($"{method} already exists in the storage for {address} in {stack}.");
+                }
+            }
         }
     }
 }
 
-return;
+static void DumpStack(StackInfo stack, IReadOnlyDictionary<ulong, MethodDCEndVerbose> stackMethodMap)
+{
+    Console.WriteLine($"Stack {stack.Id} Size: {stack.Addresses.Length}");
+    foreach (var address in stack.Addresses)
+    {
+        if (stackMethodMap.TryGetValue(address, out var method))
+            Console.WriteLine($"\tAddress {address} {method.MethodNamespace} {method.MethodName} {method.MethodSignature}");
+        else
+            Console.WriteLine($"\tAddress {address} <Unknown>");
+    }
+}

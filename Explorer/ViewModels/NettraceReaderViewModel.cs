@@ -69,7 +69,7 @@ public sealed class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, 
 public sealed class StackViewModel(StackInfo stackInfo)
 {
     public int Id { get; } = stackInfo.Id;
-    public ImmutableArray<long> Addresses { get; } = stackInfo.Addresses;
+    public ImmutableArray<ulong> Addresses { get; } = stackInfo.Addresses;
 }
 
 public sealed class SequencePointBlockViewModel(SequencePointBlock block)
