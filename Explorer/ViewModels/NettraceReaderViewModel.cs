@@ -70,7 +70,7 @@ public sealed class AddressViewModel(ulong address, MethodDCEndVerbose method)
 {
     public ulong Address { get; } = address;
     public MethodDCEndVerbose Method { get; } = method;
-    public override string ToString() => $"0x{Address:x} {Method.MethodSignature} {Method.MethodNamespace} {Method.MethodName}";
+    public override string ToString() => $"0x{Address:X16} {Method.MethodSignature} {Method.MethodNamespace} {Method.MethodName}";
 }
 
 public sealed class StackViewModel(int id, ImmutableArray<AddressViewModel> addresses)
@@ -213,7 +213,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         var allMethods = allParsedEvents.Where(e => e is MethodDCEndVerbose).Cast<MethodDCEndVerbose>()
             .OrderBy(m => m.MethodStartAddress)
             .ToImmutableArray();
-        Dictionary<ulong, MethodDCEndVerbose> addressMethodMap = []; 
+        Dictionary<ulong, MethodDCEndVerbose> addressMethodMap = [];
         ImmutableArray<StackInfo> stacks = [.. file.StackBlocks.Select(block => block.BuildStackInfos(file.Trace.PointerSize)).SelectMany(s => s)];
         foreach (var stack in stacks)
         {
