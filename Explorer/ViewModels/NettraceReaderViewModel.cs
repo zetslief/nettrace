@@ -108,6 +108,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
         _storageProvider = storageProvider;
         ReadFileCommand = ReactiveCommand.Create(OnFileRead);
         BrowseFileCommand = ReactiveCommand.Create(OnFileBrowseAsync);
+        ClearFilterSelection = ReactiveCommand.Create(OnClearFilterSelection);
 
         _parser.OnFileChanged += (s, e)
             => ReadFile(parser.GetFile() ?? throw new InvalidOperationException($"Failed to get nettrace file."));
@@ -118,6 +119,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
 
     public ICommand ReadFileCommand { get; }
     public ICommand BrowseFileCommand { get; }
+    public ICommand ClearFilterSelection { get; }
 
     public string? FilePath
     {
@@ -156,6 +158,11 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     {
         get => _status;
         private set => this.RaiseAndSetIfChanged(ref _status, value);
+    }
+
+    private void OnClearFilterSelection()
+    {
+        SelectedEventTypes.Clear();
     }
 
     private async Task OnFileBrowseAsync()

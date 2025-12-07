@@ -83,7 +83,10 @@
             <TabItem Header="Event Blobs">
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Right">
-                        <Label DockPanel.Dock="Top">Event Types</Label>
+                        <DockPanel DockPanel.Dock="Top">
+                            <Label VerticalAlignment="Center">Event Types</Label>
+                            <Button Command="{Binding ClearFilterSelection}">Clear</Button>
+                        </DockPanel>
                         <ListBox ItemsSource="{Binding EventTypes}" SelectedItems="{Binding SelectedEventTypes}" SelectionMode="Multiple" />
                     </DockPanel>
                     <ListBox ItemsSource="{Binding FilteredEventBlobs}" SelectionMode="Multiple" />
