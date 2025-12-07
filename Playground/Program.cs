@@ -34,45 +34,19 @@ var methods = events
     .ToImmutableArray();
 foreach (var stack in stacks)
 {
-    BuildAddressMethodMap(stack, methods, addressMethodMap);
+    var error = StackHelpers.TryBuildAddressMethodMap(stack, methods, addressMethodMap);
+    if (error is not null) throw new InvalidOperationException($"{error}");
     DumpStack(stack, addressMethodMap);
-}
-
-static void BuildAddressMethodMap(
-    StackInfo stack,
-    ImmutableArray<MethodDCEndVerbose> methods,
-    Dictionary<ulong, MethodDCEndVerbose> storage)
-{
-    foreach (var address in stack.Addresses)
-    {
-        foreach (var method in methods)
-        {
-            var start = method.MethodStartAddress;
-            var end = start + method.MethodSize;
-            if (address >= start && address <= end)
-            {
-                if (!storage.TryGetValue(address, out var existingMethod))
-                {
-                    storage.Add(address, method);
-                }
-                else
-                {
-                    if (existingMethod != method)
-                        throw new InvalidOperationException($"{method} already exists in the storage for {address} in {stack}.");
-                }
-            }
-        }
-    }
 }
 
 static void DumpStack(StackInfo stack, IReadOnlyDictionary<ulong, MethodDCEndVerbose> stackMethodMap)
 {
-    Console.WriteLine($"Stack {stack.Id} Size: {stack.Addresses.Length}");
+    Console.WriteLine($"Stack {stack.Id} Height: {stack.Addresses.Length}");
     foreach (var address in stack.Addresses)
     {
         if (stackMethodMap.TryGetValue(address, out var method))
-            Console.WriteLine($"\tAddress {address} {method.MethodNamespace} {method.MethodName} {method.MethodSignature}");
+            Console.WriteLine($"\t0x{address:x} {method.MethodSignature} {method.MethodNamespace} {method.MethodName}");
         else
-            Console.WriteLine($"\tAddress {address} <Unknown>");
+            Console.WriteLine($"\t0x{address:x} <Unknown>");
     }
 }
