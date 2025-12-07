@@ -387,8 +387,6 @@ public static class NettraceReader
         var eventBlobs = new List<EventBlob<T>>(100);
         while (cursor < blockBytes.Length)
         {
-            if (blockBytes.Length == 597)
-                Console.WriteLine("hello");
             var flag = blockBytes[cursor++];
             var firstBitIsSet = (flag & 1) != 0;
             var secondBitIsSet = (flag & 2) != 0;

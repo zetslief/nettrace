@@ -66,10 +66,17 @@ public sealed class EventBlobViewModel(Trace trace, EventBlob<Event> eventBlob, 
     }
 }
 
-public sealed class StackViewModel(StackInfo stackInfo)
+public sealed class AddressViewModel(ulong address, MethodDCEndVerbose method)
 {
-    public int Id { get; } = stackInfo.Id;
-    public ImmutableArray<ulong> Addresses { get; } = stackInfo.Addresses;
+    public ulong Address { get; } = address;
+    public MethodDCEndVerbose Method { get; } = method;
+    public override string ToString() => $"0x{Address:x} {Method.MethodSignature} {Method.MethodNamespace} {Method.MethodName}";
+}
+
+public sealed class StackViewModel(int id, ImmutableArray<AddressViewModel> addresses)
+{
+    public int Id { get; } = id;
+    public ImmutableArray<AddressViewModel> Addresses { get; } = addresses;
 }
 
 public sealed class SequencePointBlockViewModel(SequencePointBlock block)
@@ -92,6 +99,7 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
     private IEnumerable<EventBlobViewModel> _filteredEventBlobs = [];
     private ImmutableArray<StackViewModel> _allStacks = [];
     private ImmutableArray<SequencePointBlockViewModel> _sequencePointBlock = [];
+    private ImmutableDictionary<ulong, MethodDCEndVerbose> _addressMethodMap = [];
 
     public NettraceReaderViewModel(ILogger<NettraceReaderViewModel> logger, NettraceParser parser, IStorageProvider storageProvider)
     {
@@ -199,17 +207,30 @@ public class NettraceReaderViewModel : ReactiveObject, IViewModel
                 metadataIsIncomplete = true;
             }
         }
+        var allParsedEvents = file.EventBlocks.SelectMany(block => block.EventBlobs)
+            .Select(blob => (object)NettraceEventParser.ProcessEvent(metadataCache[blob.MetadataId].Payload, blob))
+            .ToImmutableArray();
+        var allMethods = allParsedEvents.Where(e => e is MethodDCEndVerbose).Cast<MethodDCEndVerbose>()
+            .OrderBy(m => m.MethodStartAddress)
+            .ToImmutableArray();
+        Dictionary<ulong, MethodDCEndVerbose> addressMethodMap = []; 
+        ImmutableArray<StackInfo> stacks = [.. file.StackBlocks.Select(block => block.BuildStackInfos(file.Trace.PointerSize)).SelectMany(s => s)];
+        foreach (var stack in stacks)
+        {
+            StackBuildError? error = StackHelpers.TryBuildAddressMethodMap(stack, allMethods, addressMethodMap);
+            if (error is not null) _logger.LogError("{Error}", error);
+        }
         _allEventBlobs = metadataIsIncomplete ? [] : [.. file.EventBlocks
             .SelectMany(block => block.EventBlobs)
             .Select(blob => new EventBlobViewModel(_trace, blob, metadataCache[blob.MetadataId]))
         ];
+        _addressMethodMap = addressMethodMap.ToImmutableDictionary();
         SelectedEventTypes.Clear();
         EventTypes = [.. _allEventBlobs.Select(e => e.RawEvent.GetType()).Distinct()];
-        AllStacks = [.. file.StackBlocks
-            .Select(sb => sb.Stacks
-                .Select((s, i) => new StackViewModel(StackHelpers.BuildStackInfo(sb.FirstId + i, file.Trace.PointerSize, s))))
-            .Aggregate((acc, ss) => acc.Concat(ss))
-        ];
+        AllStacks = [.. stacks.Select(stack => new StackViewModel(
+            stack.Id,
+            [.. stack.Addresses.Select(address => new AddressViewModel(address, addressMethodMap[address]))]
+        ))];
         AllSequencePointBlocks = [.. file.SequencePointBlocks.Select(spb => new SequencePointBlockViewModel(spb))];
     }
 
