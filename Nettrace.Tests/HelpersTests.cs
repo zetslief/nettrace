@@ -1,5 +1,5 @@
-using Nettrace;
 using System.Collections.Generic;
+using Nettrace;
 
 namespace Nettrace.Tests;
 

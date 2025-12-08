@@ -1,10 +1,9 @@
-﻿using System.Collections.Immutable;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using Nettrace;
 using Nettrace.HighLevel;
 using Nettrace.PayloadParsers;
-
 using static Nettrace.NettraceReader;
 
 using var stream = new MemoryStream(File.ReadAllBytes("/home/cube/progs/nettrace/traces/tpleventsource_profileme.nettrace"));
@@ -45,7 +44,7 @@ foreach (var (taskId, beginTuple) in traceBegins)
     var (beginBlob, begin) = beginTuple;
     if (traceEnds.TryGetValue(taskId, out var endTuple))
     {
-        var (endBlob, end) = endTuple;
+        var (endBlob, enf) = endTuple;
         var duration = endBlob.TimeStamp - beginBlob.TimeStamp;
         Console.WriteLine($"TaskId {taskId} {begin.OperationName} Duration: {duration}");
     }
