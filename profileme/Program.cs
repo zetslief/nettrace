@@ -50,7 +50,7 @@ public class TraceSpan : EventSource
     [Event(2)]
     public void SpanFinish(Guid id) => WriteEvent(2, id);
 
-    public static Guid? Start(string operationName) => Log.IsEnabled() ?  Log.SpanStart(operationName) : null;
+    public static Guid? Start(string operationName) => Log.IsEnabled() ? Log.SpanStart(operationName) : null;
 
     public static void Finish(Guid? guid)
     {

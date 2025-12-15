@@ -26,15 +26,22 @@ public static class Runner
 {
     public static void Record(string projectPath, string outputPath)
     {
-        var (buildSuccess, maybeOutput, maybeDllPath) = BuildProject(projectPath);
+        var (buildSuccess, maybeOutput, maybeProjectDllPath) = BuildProject(projectPath);
         Console.WriteLine($"BuildOutput: {maybeOutput}");
         if (!buildSuccess) throw new InvalidOperationException($"Build failed: {projectPath}.");
-        Debug.Assert(maybeDllPath is not null);
-        Console.WriteLine($"Output dll: {maybeDllPath}");
+        Debug.Assert(maybeProjectDllPath is not null);
+        var (runSuccess, maybeProjectProcess) = RunExecutable(maybeProjectDllPath.WithoutExtension());
+        if (!runSuccess) throw new InvalidOperationException($"Failed to run: {maybeProjectDllPath}");
+        Debug.Assert(maybeProjectProcess is not null);
+        using Process projectProcess = maybeProjectProcess;
+        {
+            Console.WriteLine($"{maybeProjectDllPath} started: {projectProcess.Id}");
+            projectProcess.Kill();
+        }
         throw new NotImplementedException(nameof(Record));
     }
 
-    static (bool Success, string? Output, string? dllName) BuildProject(string projectFilePath)
+    static (bool Success, string? Output, string? DllName) BuildProject(string projectFilePath)
     {
         // TODO: add exception handling.
         using var buildProcess = Process.Start(new ProcessStartInfo("dotnet")
@@ -49,10 +56,11 @@ public static class Runner
         if (buildProcess.ExitCode != 0) return (false, output, null);
 
         // Example output:
-        // profileme net10.0 succeeded (0.4s) -> profileme/bin/Debug/net10.0/profileme.dll
+        // profileme -> profileme/bin/Debug/net10.0/profileme.dll
+        var projectFileName = Path.GetFileNameWithoutExtension(projectFilePath);
         foreach (var line in output.Split(Environment.NewLine))
         {
-            if (!line.Contains("Build ->")) continue;
+            if (!line.Contains($"{projectFileName} ->")) continue;
             var lineSpan = line.AsSpan();
             var indexOfArrow = lineSpan.IndexOf('>');
             if (indexOfArrow < 0) continue;
@@ -61,6 +69,16 @@ public static class Runner
             return (true, output, new string(lineSpan[dllNameStart..]));
         }
         return (false, output, null);
+    }
+
+    static (bool Success, Process? Process) RunExecutable(string executablePath)
+    {
+        var runProcess = Process.Start(new ProcessStartInfo(executablePath)
+        {
+            RedirectStandardOutput = true,
+        });
+        if (runProcess is null) return (false, null);
+        return (true, runProcess);
     }
 }
 
@@ -107,3 +125,11 @@ public static class WriterExtensions
     }
 }
 
+
+public static class PathHelpers
+{
+    extension(string path)
+    {
+        public string WithoutExtension() => path[..^4];
+    }
+}
