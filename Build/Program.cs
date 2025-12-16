@@ -71,10 +71,11 @@ public static class Runner
         return (false, output, null);
     }
 
-    static (bool Success, Process? Process) RunExecutable(string executablePath)
+    static (bool Success, Process? Process) RunExecutable(string executablePath, string args = "" )
     {
         var runProcess = Process.Start(new ProcessStartInfo(executablePath)
         {
+            Arguments = args,
             RedirectStandardOutput = true,
         });
         if (runProcess is null) return (false, null);

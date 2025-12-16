@@ -18,6 +18,16 @@ public enum IpcError : uint
 public static class DiagnosticIpc
 {
     private const int HEADER_SIZE = 20;
+    private const string DIAGNOSTIC_FILE_PREFIX = "dotnet-diagnostic-";
+
+    public static bool TryGetDiagnosticFileForProcess(int processId, [NotNullWhen(true)] out string? diagnosticFilePath)
+    {
+        string directory = Environment.GetEnvironmentVariable("TMP") ?? "/tmp";
+        string[] files = Directory.GetFiles(directory, $"{DIAGNOSTIC_FILE_PREFIX}*");
+        string processIdString = processId.ToString();
+        diagnosticFilePath = files.FirstOrDefault(f => f.Contains(processIdString));
+        return !string.IsNullOrEmpty(diagnosticFilePath);
+    }
 
     public static async Task<(IpcError?, ulong? sessionId)> TryCollectTracing(Socket socket, IReadOnlyCollection<Provider> providers)
     {
